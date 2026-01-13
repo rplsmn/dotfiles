@@ -1,0 +1,58 @@
+[init]
+	defaultBranch = main
+[core]
+	editor = nano
+	autocrlf = true
+[user]
+	name = Raphaël Simon
+	email = 74007913+rplsmn@users.noreply.github.com
+[credential]
+	helper = store
+[diff]
+        algorithm = histogram
+        colorMoved = plain
+        mnemonicPrefix = true
+        renames = true
+[column]
+        ui = auto
+[branch]
+        sort = -committerdate
+[tag]
+        sort = version:refname
+[push]
+        default = simple
+        autoSetupRemote = true
+        followTags = true
+[fetch]
+        prune = true
+        pruneTags = true
+        all = true
+[pull]
+	rebase = true
+[rebase]
+	autoSquash = true
+        autoStash = true
+        updateRefs = true
+[help]
+        autocorrect = prompt
+[commit]
+        verbose = true
+[rerere]
+        enabled = true
+        autoupdate = true
+[alias]
+	pom = push origin main
+        poma = push origin master
+        co = checkout
+        cob = checkout -b
+        s = status
+        st = status -b
+        br = branch
+        brd = branch -d
+        last = log -1 HEAD
+        cane = commit --amend --no-edit
+        lo = log --oneline -n 10
+        undo = reset HEAD~1 --mixed
+        oops = reset --soft HEAD
+	plog = log --graph --abbrev-commit --decorate --format=format:'%C(bold blue)%h%C(reset) - %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(dim white)- %an%C(reset)%C(bold yellow)%d%C(reset)' --all
+	cm = !git add -A && git commit
