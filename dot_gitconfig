@@ -1,0 +1,59 @@
+[user]
+# Please adapt and uncomment the following lines:
+	name = Raphael Simon
+	email = 74007913+rplsmn@users.noreply.github.com
+[alias]
+	ls = log --pretty=format:"%C(yellow)%h%Cred%d\\ %Creset%s%Cblue\\ [%cn]" --decorate
+	ll = log --pretty=format:"%C(yellow)%h%Cred%d\\ %Creset%s%Cblue\\ [%cn]" --decorate --numstat
+	lds = log --pretty=format:"%C(yellow)%h\\ %ad%Cred%d\\ %Creset%s%Cblue\\ [%cn]" --decorate --date=short
+	ld = log --pretty=format:"%C(yellow)%h\\ %ad%Cred%d\\ %Creset%s%Cblue\\ [%cn]" --decorate --date=relative
+	filelog = log -u
+	fl = log -u
+	dl = "!git ll -1"
+	dlc = diff --cached HEAD^
+	f = "!git ls-files | grep -i"
+	grep = grep -Ii
+	gr = grep -Ii
+	la = "!git config -l | grep alias | cut -c 7-"
+	ec = config --global -e
+	chp = cherry-pick
+	s = status
+	st = status -s
+	cl = clone
+	cm = commit -a
+	cane = commit --amend --no-edit
+	amend = commit -a --amend
+	rpo = remote prune origin
+	co = checkout
+	cob = checkout -b
+	sc = switch -c
+	sw = switch
+	save = !git add -A && git commit -m 'chore: commit save point'
+	br = branch
+	brc = branch --format='%(HEAD) %(color:yellow)%(refname:short)%(color:reset) - %(contents:subject) %(color:green)(%(committerdate:relative)) [%(authorname)]' --sort=-committerdate
+	brd = branch -d
+	diff = diff --word-diff
+	dc = diff --cached
+	undo = reset HEAD~1 --mixed
+	r = reset
+	r1 = reset HEAD^
+	r2 = reset HEAD^^
+	rh = reset --hard
+	rh1 = reset HEAD^ --hard
+	rh2 = reset HEAD^^ --hard
+	done = !git push origin HEAD
+	fo = fetch origin
+	pom = push origin main
+	pob = "!f() { BRANCH=$(git branch --show-current); git push origin $BRANCH;}; f"
+	sync = "!f() { BRANCH=$(git branch --show-current); git pull origin $BRANCH;}; f"
+	up = !git pull --rebase --prune $@ && git submodule update --init --recursive
+	cleanup = "!f() { BRANCH=$(git branch --show-current); git checkout main && git pull origin main && git branch -d "$BRANCH" && git remote prune origin && echo "Cleaned up branch: $BRANCH"; }; f"
+	default = !git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'
+	bclean = "!f() { DEFAULT=$(git default); git branch --merged ${1-$DEFAULT} | grep -v " ${1-$DEFAULT}$" | xargs git branch -d; }; f"
+	bdone = "!f() { DEFAULT=$(git default); git checkout ${1-$DEFAULT} && git up && git bclean ${1-$DEFAULT}; }; f"
+	migrate = "!f(){ DEFAULT=$(git default); CURRENT=$(git symbolic-ref --short HEAD); git checkout -b $1 && git branch --force $CURRENT ${3-$CURRENT@{u}} && git rebase --onto ${2-$DEFAULT} $CURRENT; }; f"
+
+[credential]
+	helper = cache
+[init]
+	defaultBranch = main
