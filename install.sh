@@ -1,7 +1,7 @@
 #!/bin/bash
 # One-time machine setup — installs tools, keys, repos, then syncs configs.
 # Prerequisites: Ubuntu LTS, git, curl, gh (installed and authenticated)
-# Usage: curl -fsSL https://raw.githubusercontent.com/rplsmn/shared-safe-config/main/install.sh | bash
+# Usage: gh repo clone rplsmn/shared-safe-config ~/shared-safe-config && bash ~/shared-safe-config/install.sh
 set -e
 
 echo "==> One-time machine setup"
@@ -43,12 +43,7 @@ else
 fi
 
 # --- Config repo ---
-REPO="$HOME/shared-safe-config"
-if [ -d "$REPO" ]; then
-  git -C "$REPO" pull --ff-only
-else
-  git clone https://github.com/rplsmn/shared-safe-config.git "$REPO"
-fi
+REPO="$(cd "$(dirname "$0")" && pwd)"
 
 # --- Install bin scripts ---
 echo "==> Installing commands to ~/.local/bin"
