@@ -27,9 +27,18 @@ else
   git -C "$HOME/.artifacts" pull --ff-only || true
 fi
 
-# --- Shell config ---
-echo "==> Installing bashrc"
-cp "$REPO_DIR/dot_bashrc" "$HOME/.bashrc"
+# --- Shell config (append, idempotent via marker block) ---
+echo "==> Installing bashrc additions"
+MARKER_START="# >>> shared-safe-config >>>"
+MARKER_END="# <<< shared-safe-config <<<"
+if [ -f "$HOME/.bashrc" ]; then
+  sed -i "/$MARKER_START/,/$MARKER_END/d" "$HOME/.bashrc"
+fi
+{
+  echo "$MARKER_START"
+  cat "$REPO_DIR/dot_bashrc"
+  echo "$MARKER_END"
+} >> "$HOME/.bashrc"
 
 # --- Git config ---
 echo "==> Installing gitconfig"
