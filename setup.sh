@@ -5,6 +5,11 @@ REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "==> Setting up machine from $REPO_DIR"
 
+# --- Dependencies ---
+echo "==> Installing dependencies"
+sudo apt-get update -qq
+sudo apt-get install -y -qq jq
+
 # --- SSH key ---
 if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
   echo "==> Generating SSH key"
@@ -64,7 +69,12 @@ cp "$REPO_DIR/global-instructions.md" "$HOME/.vibe/prompts/cli.md"
 echo "==> Installing Claude Code config"
 cp "$REPO_DIR/claude-code/claude-statusline.sh" "$HOME/.claude/statusline.sh"
 chmod +x "$HOME/.claude/statusline.sh"
-cp "$REPO_DIR/claude-code/claude-global-settings.json" "$HOME/.claude/settings.json"
+if [ -f "$HOME/.claude/settings.json" ]; then
+  jq -s '.[0] * .[1]' "$HOME/.claude/settings.json" "$REPO_DIR/claude-code/claude-global-settings.json" > "$HOME/.claude/settings.json.tmp"
+  mv "$HOME/.claude/settings.json.tmp" "$HOME/.claude/settings.json"
+else
+  cp "$REPO_DIR/claude-code/claude-global-settings.json" "$HOME/.claude/settings.json"
+fi
 
 echo ""
 echo "==> Done! Open a new terminal or run: source ~/.bashrc"
