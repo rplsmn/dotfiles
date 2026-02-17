@@ -53,12 +53,13 @@ fi
 # --- Install bin scripts ---
 echo "==> Installing commands to ~/.local/bin"
 mkdir -p "$HOME/.local/bin"
+export PATH="$HOME/.local/bin:$PATH"
 cp "$REPO/bin/artifact-sync" "$HOME/.local/bin/"
 cp "$REPO/bin/machine-sync-remote" "$HOME/.local/bin/"
 
 # --- Artifacts repo ---
 echo "==> Syncing artifacts"
-"$HOME/.local/bin/artifact-sync"
+artifact-sync
 
 # --- Sync configs ---
 bash "$REPO/sync.sh"
