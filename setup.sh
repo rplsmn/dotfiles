@@ -12,6 +12,26 @@ if ! command -v jq &>/dev/null; then
   sudo apt-get install -y -qq jq
 fi
 
+# --- GitHub CLI ---
+if ! command -v gh &>/dev/null; then
+  echo "==> Installing GitHub CLI"
+  (type -p wget >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq wget)) \
+    && sudo mkdir -p -m 755 /etc/apt/keyrings \
+    && out=$(mktemp) && wget -nv -O"$out" https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    && cat "$out" | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+    && sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+    && sudo mkdir -p -m 755 /etc/apt/sources.list.d \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && sudo apt-get update -qq \
+    && sudo apt-get install -y -qq gh
+  rm -f "$out"
+fi
+
+if ! gh auth status &>/dev/null; then
+  echo "==> GitHub CLI not authenticated, starting login"
+  gh auth login
+fi
+
 # --- SSH key ---
 if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
   echo "==> Generating SSH key"
@@ -76,6 +96,17 @@ if [ -f "$HOME/.claude/settings.json" ]; then
   mv "$HOME/.claude/settings.json.tmp" "$HOME/.claude/settings.json"
 else
   cp "$REPO_DIR/claude-code/claude-global-settings.json" "$HOME/.claude/settings.json"
+fi
+
+# --- CLI tools ---
+if ! command -v claude &>/dev/null; then
+  echo "==> Installing Claude Code"
+  curl -fsSL https://claude.ai/install.sh | bash
+fi
+
+if ! command -v vibe &>/dev/null; then
+  echo "==> Installing Mistral Vibe"
+  curl -LsSf https://mistral.ai/vibe/install.sh | bash
 fi
 
 echo ""

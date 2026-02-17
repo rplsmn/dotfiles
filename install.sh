@@ -8,7 +8,7 @@ REPO="$HOME/shared-safe-config"
 if [ -d "$REPO" ]; then
   git -C "$REPO" pull --ff-only
 else
-  gh repo clone rplsmn/shared-safe-config "$REPO"
+  git clone https://github.com/rplsmn/shared-safe-config.git "$REPO"
 fi
 
 bash "$REPO/setup.sh"
