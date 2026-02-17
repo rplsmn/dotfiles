@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# artifact-sync — clone or sync the artifacts repo
+# Run once on new machines, or anytime to force sync.
+
+set -euo pipefail
+
+ARTIFACTS_DIR="${ARTIFACTS_DIR:-$HOME/.artifacts}"
+ARTIFACTS_REMOTE="${ARTIFACTS_REMOTE:-git@github.com:rplsmn/llm-artifacts.git}"
+
+if [[ -d "$ARTIFACTS_DIR/.git" ]]; then
+  echo "── Pulling latest artifacts ──"
+  git -C "$ARTIFACTS_DIR" pull --rebase --autostash
+else
+  echo "── First-time clone ──"
+  git clone "$ARTIFACTS_REMOTE" "$ARTIFACTS_DIR"
+fi
+
+echo "✓ Artifacts ready at $ARTIFACTS_DIR"

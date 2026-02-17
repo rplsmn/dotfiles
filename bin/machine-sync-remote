@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# machine-sync-remote — pull latest config repo and sync configs to machine
+# Usage: machine-sync-remote
+
+set -euo pipefail
+
+REPO="${HOME}/shared-safe-config"
+
+if [[ ! -d "$REPO" ]]; then
+  echo "Error: $REPO not found. Run install.sh first." >&2
+  exit 1
+fi
+
+echo "==> Pulling latest configs"
+git -C "$REPO" pull --ff-only
+
+echo "==> Running sync"
+bash "$REPO/sync.sh"
