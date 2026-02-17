@@ -6,9 +6,11 @@ REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 echo "==> Setting up machine from $REPO_DIR"
 
 # --- Dependencies ---
-echo "==> Installing dependencies"
-sudo apt-get update -qq
-sudo apt-get install -y -qq jq
+if ! command -v jq &>/dev/null; then
+  echo "==> Installing jq"
+  sudo apt-get update -qq
+  sudo apt-get install -y -qq jq
+fi
 
 # --- SSH key ---
 if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
