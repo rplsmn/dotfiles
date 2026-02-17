@@ -42,15 +42,6 @@ else
   echo "==> SSH key already exists, skipping"
 fi
 
-# --- Artifacts repo ---
-if [ ! -d "$HOME/.artifacts" ]; then
-  echo "==> Cloning llm-artifacts"
-  gh repo clone rplsmn/llm-artifacts "$HOME/.artifacts"
-else
-  echo "==> Artifacts repo exists, pulling latest"
-  git -C "$HOME/.artifacts" pull --ff-only || true
-fi
-
 # --- Config repo ---
 REPO="$HOME/shared-safe-config"
 if [ -d "$REPO" ]; then
@@ -58,6 +49,16 @@ if [ -d "$REPO" ]; then
 else
   git clone https://github.com/rplsmn/shared-safe-config.git "$REPO"
 fi
+
+# --- Install bin scripts ---
+echo "==> Installing commands to ~/.local/bin"
+mkdir -p "$HOME/.local/bin"
+cp "$REPO/bin/artifact-sync" "$HOME/.local/bin/"
+cp "$REPO/bin/machine-sync-remote" "$HOME/.local/bin/"
+
+# --- Artifacts repo ---
+echo "==> Syncing artifacts"
+"$HOME/.local/bin/artifact-sync"
 
 # --- Sync configs ---
 bash "$REPO/sync.sh"

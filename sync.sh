@@ -50,4 +50,10 @@ else
   cp "$REPO_DIR/claude-code/claude-global-settings.json" "$HOME/.claude/settings.json"
 fi
 
+# --- Bin scripts ---
+echo "==> Syncing commands to ~/.local/bin"
+mkdir -p "$HOME/.local/bin"
+cp "$REPO_DIR/bin/artifact-sync" "$HOME/.local/bin/"
+cp "$REPO_DIR/bin/machine-sync-remote" "$HOME/.local/bin/"
+
 echo "==> Done! Open a new terminal or run: source ~/.bashrc"
