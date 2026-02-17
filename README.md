@@ -4,10 +4,10 @@ Setup new machine with this:
 curl -fsSL https://raw.githubusercontent.com/rplsmn/shared-safe-config/main/install.sh | bash
 ```
 
-Requires: Ubuntu, git, curl, and [GitHub CLI](https://cli.github.com/) (`gh`) installed and authenticated.
+Requires: Ubuntu LTS, git, curl, and [GitHub CLI](https://cli.github.com/) (`gh`) installed and authenticated.
 
-Re-run anytime to pull latest configs:
+After pulling config changes, re-sync without reinstalling tools:
 
 ```bash
-bash ~/shared-safe-config/setup.sh
+bash ~/shared-safe-config/sync.sh
 ```
