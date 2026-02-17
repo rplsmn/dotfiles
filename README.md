@@ -11,3 +11,9 @@ After pulling config changes, re-sync without reinstalling tools:
 ```bash
 machine-sync-remote
 ```
+
+Syncing artifacts : 
+
+```bash
+artifact-sync
+```
