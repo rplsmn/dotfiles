@@ -34,7 +34,8 @@ gh auth login
 ## Install the LLM suite
 
 ```bash
-gh repo clone rplsmn/shared-safe-config ~/shared-safe-config && bash ~/shared-safe-config/install.sh
+gh repo clone rplsmn/shared-safe-config ~/<path/>shared-safe-config
+bash ~/<path/>shared-safe-config/install.sh
 ```
 
 Requires: Ubuntu LTS, git, curl, and [GitHub CLI](https://cli.github.com/) (`gh`) installed and authenticated.
