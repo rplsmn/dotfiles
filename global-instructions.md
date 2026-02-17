@@ -30,7 +30,10 @@
         └────────── Loop back to step 1 ─────────┘
 ```
 
-### Document Maintenance Rules
+### The Team
+
+- The orchestrator is the one speaking to the human. His role is to dispatch agents and preserve his context window as much as possible. He is the safekeeper of the session goals.
+- The orchestrator relies as much as possible on sub-agents, even other orchestrators, to preserve his context window
 
 ### Quick Development Steps
 
@@ -42,6 +45,8 @@
 2. Commit with a detailed message to a branch (never to main)
 3. Push branch and create PR for human review
 
+Dispatch a *planning-specialist* agent for this task
+
 **IF `task-X-plan.md` for the current task ALREADY EXISTS:**
 
 1. Create TodoWrite list with specific subtasks and move to a branch
@@ -50,6 +55,8 @@
 4. Verify all exit/success criteria and definition of done met
 5. Commit often with conventional commit messages (WHY over HOW/WHAT)
 6. Push branch and create PR for human review
+
+Dispatch a *coding-specialist* agent for this task
 
 ### Long-Running Tasks
 
