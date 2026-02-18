@@ -4,48 +4,81 @@ parse_git_branch() {
 
 PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[33m\]$(parse_git_branch)\[\033[00m\]\$ '
 
-claude() {
+# --- Shared artifact helpers ---
+
+# Detect repo name from current directory
+_artifact_repo_name() {
+  basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || true
+}
+
+# Ensure artifact dir exists, print path. Returns 1 if no repo detected.
+_artifact_ensure_dir() {
   local artifacts_root="${ARTIFACTS_DIR:-$HOME/.artifacts}"
-  local extra_args=()
-
-  # Detect current git repo
   local repo_name
-  repo_name="$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)" || true
+  repo_name="$(_artifact_repo_name)"
 
-  if [[ -n "$repo_name" ]]; then
-    local artifact_dir="${artifacts_root}/${repo_name}"
-
-    # Create project subfolder on first use
-    if [[ ! -d "$artifact_dir" ]]; then
-      mkdir -p "${artifact_dir}"/{plans,research,sessions,archive}
-      echo "⚡ Created artifact dir: ${artifact_dir}"
-    fi
-
-    extra_args+=(--add-dir "$artifact_dir")
+  if [[ -z "$repo_name" ]]; then
+    return 1
   fi
 
-  # Run claude
+  local artifact_dir="${artifacts_root}/${repo_name}"
+  if [[ ! -d "$artifact_dir" ]]; then
+    mkdir -p "${artifact_dir}"/{plans,research,sessions,archive}
+    echo "⚡ Created artifact dir: ${artifact_dir}" >&2
+  fi
+
+  echo "$artifact_dir"
+}
+
+# Auto-commit + push artifacts if there are changes
+_artifact_commit_and_push() {
+  local artifacts_root="${ARTIFACTS_DIR:-$HOME/.artifacts}"
+  local repo_name
+  repo_name="$(_artifact_repo_name)"
+
+  if [[ ! -d "$artifacts_root/.git" ]]; then
+    return 0
+  fi
+
+  local has_changes=false
+  if ! git -C "$artifacts_root" diff --quiet 2>/dev/null; then
+    has_changes=true
+  fi
+  if [[ -n "$(git -C "$artifacts_root" ls-files --others --exclude-standard 2>/dev/null)" ]]; then
+    has_changes=true
+  fi
+
+  if [[ "$has_changes" == true ]]; then
+    git -C "$artifacts_root" add -A
+    git -C "$artifacts_root" commit -m "${repo_name:-misc}: $(date +%Y-%m-%d-%H%M)" --quiet
+    git -C "$artifacts_root" pull --rebase --autostash --quiet 2>/dev/null
+    git -C "$artifacts_root" push --quiet 2>/dev/null &
+    echo "📦 Artifacts committed & pushing..."
+  fi
+}
+
+# --- Tool wrappers ---
+
+claude() {
+  local extra_args=()
+  local artifact_dir
+  artifact_dir="$(_artifact_ensure_dir)" && extra_args+=(--add-dir "$artifact_dir")
+
   command claude "${extra_args[@]}" "$@"
   local exit_code=$?
 
-  # Auto-commit + push artifacts on exit
-  if [[ -d "$artifacts_root/.git" ]]; then
-    local has_changes=false
-    if ! git -C "$artifacts_root" diff --quiet 2>/dev/null; then
-      has_changes=true
-    fi
-    if [[ -n "$(git -C "$artifacts_root" ls-files --others --exclude-standard 2>/dev/null)" ]]; then
-      has_changes=true
-    fi
+  _artifact_commit_and_push
+  return $exit_code
+}
 
-    if [[ "$has_changes" == true ]]; then
-      git -C "$artifacts_root" add -A
-      git -C "$artifacts_root" commit -m "${repo_name:-misc}: $(date +%Y-%m-%d-%H%M)" --quiet
-      git -C "$artifacts_root" pull --rebase --autostash --quiet 2>/dev/null
-      git -C "$artifacts_root" push --quiet 2>/dev/null &
-      echo "📦 Artifacts committed & pushing..."
-    fi
-  fi
+copilot() {
+  local extra_args=()
+  local artifact_dir
+  artifact_dir="$(_artifact_ensure_dir)" && extra_args+=(--add-dir "$artifact_dir")
 
+  command copilot "${extra_args[@]}" "$@"
+  local exit_code=$?
+
+  _artifact_commit_and_push
   return $exit_code
 }
