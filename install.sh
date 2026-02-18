@@ -19,7 +19,7 @@ if ! command -v claude &>/dev/null; then
   curl -fsSL https://claude.ai/install.sh | bash
 fi
 
-if ! gh copilot version &>/dev/null 2>&1; then
+if ! command -v copilot &>/dev/null 2>&1; then
   echo "==> Installing GitHub Copilot CLI"
   curl -fsSL https://gh.io/copilot-install | bash
 fi
