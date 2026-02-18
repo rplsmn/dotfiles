@@ -54,6 +54,7 @@ fi
 echo "==> Syncing commands to ~/.local/bin"
 mkdir -p "$HOME/.local/bin"
 cp "$REPO_DIR/bin/artifact-sync" "$HOME/.local/bin/"
-cp "$REPO_DIR/bin/machine-sync-remote" "$HOME/.local/bin/"
+sed "s|^REPO=.*|REPO=\"$REPO_DIR\"|" "$REPO_DIR/bin/machine-sync-remote" > "$HOME/.local/bin/machine-sync-remote"
+chmod +x "$HOME/.local/bin/machine-sync-remote"
 
 echo "==> Done! Open a new terminal or run: source ~/.bashrc"

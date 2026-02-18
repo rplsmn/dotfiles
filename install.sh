@@ -50,7 +50,8 @@ echo "==> Installing commands to ~/.local/bin"
 mkdir -p "$HOME/.local/bin"
 export PATH="$HOME/.local/bin:$PATH"
 cp "$REPO/bin/artifact-sync" "$HOME/.local/bin/"
-cp "$REPO/bin/machine-sync-remote" "$HOME/.local/bin/"
+sed "s|^REPO=.*|REPO=\"$REPO\"|" "$REPO/bin/machine-sync-remote" > "$HOME/.local/bin/machine-sync-remote"
+chmod +x "$HOME/.local/bin/machine-sync-remote"
 
 # --- Artifacts repo ---
 echo "==> Syncing artifacts"
