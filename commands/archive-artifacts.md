@@ -3,7 +3,7 @@ description: Archive old stale LLM files in the global artifacts folder
 disable-model-invocation: true
 ---
 
-Review all files in the artifacts (~/.artifacts/<this-repo>) directory (plans/, research/, sessions/).
+Review all files in the artifacts (~/.artifacts/<this-repo>) directory. Exclude skills, agents and commands.
 
 For each file, determine if it:
 
