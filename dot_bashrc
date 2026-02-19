@@ -59,26 +59,38 @@ _artifact_commit_and_push() {
 
 # --- Tool wrappers ---
 
+_in_git_repo() {
+  git rev-parse --is-inside-work-tree &>/dev/null
+}
+
 claude() {
   local extra_args=()
-  local artifact_dir
-  artifact_dir="$(_artifact_ensure_dir)" && extra_args+=(--add-dir "$artifact_dir")
+  if _in_git_repo; then
+    local artifact_dir
+    artifact_dir="$(_artifact_ensure_dir)" && extra_args+=(--add-dir "$artifact_dir")
+  fi
 
   command claude "${extra_args[@]}" "$@"
   local exit_code=$?
 
-  _artifact_commit_and_push
+  if _in_git_repo; then
+    _artifact_commit_and_push
+  fi
   return $exit_code
 }
 
 copilot() {
   local extra_args=()
-  local artifact_dir
-  artifact_dir="$(_artifact_ensure_dir)" && extra_args+=(--add-dir "$artifact_dir")
+  if _in_git_repo; then
+    local artifact_dir
+    artifact_dir="$(_artifact_ensure_dir)" && extra_args+=(--add-dir "$artifact_dir")
+  fi
 
   command copilot "${extra_args[@]}" "$@"
   local exit_code=$?
 
-  _artifact_commit_and_push
+  if _in_git_repo; then
+    _artifact_commit_and_push
+  fi
   return $exit_code
 }
