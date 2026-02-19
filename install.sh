@@ -52,6 +52,8 @@ export PATH="$HOME/.local/bin:$PATH"
 cp "$REPO/bin/artifact-sync" "$HOME/.local/bin/"
 sed "s|^REPO=.*|REPO=\"$REPO\"|" "$REPO/bin/machine-sync-remote" > "$HOME/.local/bin/machine-sync-remote"
 chmod +x "$HOME/.local/bin/machine-sync-remote"
+cp "$REPO/bin/specs" "$HOME/.local/bin/specs"
+chmod +x "$HOME/.local/bin/specs"
 
 # --- Artifacts repo ---
 echo "==> Syncing artifacts"

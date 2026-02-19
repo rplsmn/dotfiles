@@ -1,0 +1,693 @@
+#!/bin/bash
+# specs — Cold Specs Library CLI
+# Manages activation/deactivation of LLM specs (skills, commands, agents)
+# via symlinks from a cold library to tool directories.
+set -euo pipefail
+
+# --- Configuration ---
+LIBRARY_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/llm-specs"
+LIBRARY_JSON="$LIBRARY_DIR/library.json"
+GLOBAL_MANIFEST="$LIBRARY_DIR/global-manifest.json"
+TOOL_DIRS=("$HOME/.claude" "$HOME/.copilot" "$HOME/.vibe")
+
+# --- Colors ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+DIM='\033[0;2m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+# --- Helpers ---
+
+_check_deps() {
+  if ! command -v jq &>/dev/null; then
+    echo -e "${RED}Error: jq is required but not installed. Run: sudo apt install jq${NC}" >&2
+    exit 1
+  fi
+}
+
+_check_library() {
+  if [[ ! -f "$LIBRARY_JSON" ]]; then
+    echo -e "${RED}Error: Library not found at $LIBRARY_JSON${NC}" >&2
+    echo -e "${DIM}Run sync.sh to populate the library.${NC}" >&2
+    exit 1
+  fi
+}
+
+_project_name() {
+  basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || true
+}
+
+_project_root() {
+  git rev-parse --show-toplevel 2>/dev/null || true
+}
+
+_manifest_path() {
+  local project
+  project="$(_project_name)"
+  if [[ -n "$project" ]]; then
+    local artifacts_root="${ARTIFACTS_DIR:-$HOME/.artifacts}"
+    local manifest="$artifacts_root/$project/.specs-manifest.json"
+    echo "$manifest"
+  else
+    echo "$GLOBAL_MANIFEST"
+  fi
+}
+
+_ensure_manifest() {
+  local manifest="$1"
+  if [[ ! -f "$manifest" ]]; then
+    mkdir -p "$(dirname "$manifest")"
+    echo '{"activated":[]}' > "$manifest"
+  fi
+}
+
+_get_activated() {
+  local manifest="$1"
+  _ensure_manifest "$manifest"
+  jq -r '.activated[]' "$manifest" 2>/dev/null
+}
+
+_get_core_ids() {
+  jq -r '.specs[] | select(.core == true) | .id' "$LIBRARY_JSON"
+}
+
+_get_all_ids() {
+  jq -r '.specs[].id' "$LIBRARY_JSON"
+}
+
+_spec_type() {
+  local id="$1"
+  jq -r --arg id "$id" '.specs[] | select(.id == $id) | .type' "$LIBRARY_JSON"
+}
+
+_spec_exists() {
+  local id="$1"
+  jq -e --arg id "$id" '.specs[] | select(.id == $id)' "$LIBRARY_JSON" &>/dev/null
+}
+
+_spec_is_core() {
+  local id="$1"
+  jq -e --arg id "$id" '.specs[] | select(.id == $id and .core == true)' "$LIBRARY_JSON" &>/dev/null
+}
+
+_type_subdir() {
+  local type="$1"
+  case "$type" in
+    skill)   echo "skills" ;;
+    command) echo "commands" ;;
+    agent)   echo "agents" ;;
+  esac
+}
+
+_create_symlink() {
+  local id="$1"
+  local type
+  type="$(_spec_type "$id")"
+  local subdir
+  subdir="$(_type_subdir "$type")"
+  local source_path
+
+  if [[ "$type" == "skill" ]]; then
+    source_path="$LIBRARY_DIR/$subdir/$id"
+  else
+    source_path="$LIBRARY_DIR/$subdir/${id}.md"
+  fi
+
+  if [[ ! -e "$source_path" ]]; then
+    return 1
+  fi
+
+  for tool_dir in "${TOOL_DIRS[@]}"; do
+    local target_dir="$tool_dir/$subdir"
+    mkdir -p "$target_dir"
+
+    if [[ "$type" == "skill" ]]; then
+      local link_path="$target_dir/$id"
+      # Remove real (non-symlink) dir if it exists from old direct-copy
+      if [[ -d "$link_path" && ! -L "$link_path" ]]; then
+        rm -rf "$link_path"
+      fi
+      if [[ ! -L "$link_path" ]]; then
+        ln -sfn "$source_path" "$link_path"
+      fi
+    else
+      local link_path="$target_dir/${id}.md"
+      # Remove real (non-symlink) file if it exists from old direct-copy
+      if [[ -f "$link_path" && ! -L "$link_path" ]]; then
+        rm -f "$link_path"
+      fi
+      if [[ ! -L "$link_path" ]]; then
+        ln -sf "$source_path" "$link_path"
+      fi
+    fi
+  done
+}
+
+_remove_symlink() {
+  local id="$1"
+  local type
+  type="$(_spec_type "$id")"
+  local subdir
+  subdir="$(_type_subdir "$type")"
+
+  for tool_dir in "${TOOL_DIRS[@]}"; do
+    if [[ "$type" == "skill" ]]; then
+      local link_path="$tool_dir/$subdir/$id"
+    else
+      local link_path="$tool_dir/$subdir/${id}.md"
+    fi
+    if [[ -L "$link_path" ]]; then
+      rm "$link_path"
+    fi
+  done
+}
+
+_add_to_manifest() {
+  local manifest="$1"
+  local id="$2"
+  _ensure_manifest "$manifest"
+  local tmp="${manifest}.tmp"
+  jq --arg id "$id" '.activated = (.activated + [$id] | unique)' "$manifest" > "$tmp"
+  mv "$tmp" "$manifest"
+}
+
+_remove_from_manifest() {
+  local manifest="$1"
+  local id="$2"
+  _ensure_manifest "$manifest"
+  local tmp="${manifest}.tmp"
+  jq --arg id "$id" '.activated = [.activated[] | select(. != $id)]' "$manifest" > "$tmp"
+  mv "$tmp" "$manifest"
+}
+
+_format_type() {
+  local type="$1"
+  case "$type" in
+    skill)   printf "${CYAN}%-6s${NC}" "skill" ;;
+    command) printf "${YELLOW}%-6s${NC}" "cmd" ;;
+    agent)   printf "${BLUE}%-6s${NC}" "agent" ;;
+  esac
+}
+
+# --- Subcommands ---
+
+cmd_help() {
+  cat <<'EOF'
+specs — Cold Specs Library CLI
+
+Usage: specs <subcommand> [options] [arguments]
+
+Subcommands:
+  status          Show current activation state (default)
+  list            List all specs in the library
+  search          Search specs by keyword or tag
+  activate        Activate specs for the current project
+  deactivate      Deactivate specs for the current project
+  auto            Auto-detect project type and activate matching specs
+  sync            Rebuild symlinks from manifest (repair tool)
+  reset           Reset to core-only (deactivate all library specs)
+  help            Show this help message
+
+Options:
+  --tag TAG       Filter by tag (list subcommand)
+  --type TYPE     Filter by type: skill, command, agent (list subcommand)
+  --global        Use global manifest instead of per-project (activate/deactivate)
+  --quiet         Suppress output (auto subcommand)
+  --dry-run       Show what would happen without doing it (auto subcommand)
+
+Examples:
+  specs                           # show current status
+  specs list --tag r              # list R-related specs
+  specs search "code review"      # search by keyword
+  specs activate solve-issue      # activate a spec
+  specs auto                      # auto-detect and activate
+  specs reset                     # return to core-only
+EOF
+}
+
+cmd_status() {
+  _check_deps
+  _check_library
+
+  local project
+  project="$(_project_name)"
+  local project_root
+  project_root="$(_project_root)"
+  local manifest
+  manifest="$(_manifest_path)"
+
+  if [[ -n "$project" ]]; then
+    echo -e "${BOLD}Project:${NC} $project ${DIM}(detected from $project_root)${NC}"
+    echo -e "${BOLD}Manifest:${NC} $manifest"
+  else
+    echo -e "${BOLD}Project:${NC} ${DIM}(none — using global manifest)${NC}"
+    echo -e "${BOLD}Manifest:${NC} $GLOBAL_MANIFEST"
+  fi
+  echo ""
+
+  # Core specs
+  echo -e "${BOLD}Core specs (always active):${NC}"
+  while IFS= read -r id; do
+    local type
+    type="$(_spec_type "$id")"
+    printf "  ${GREEN}✓${NC} "
+    _format_type "$type"
+    printf "  %s\n" "$id"
+  done < <(_get_core_ids)
+  echo ""
+
+  # Activated specs
+  _ensure_manifest "$manifest"
+  local activated
+  activated="$(_get_activated "$manifest")"
+  if [[ -n "$activated" ]]; then
+    echo -e "${BOLD}Activated specs:${NC}"
+    while IFS= read -r id; do
+      if _spec_exists "$id"; then
+        local type
+        type="$(_spec_type "$id")"
+        printf "  ${GREEN}✓${NC} "
+        _format_type "$type"
+        printf "  %s\n" "$id"
+      fi
+    done <<< "$activated"
+    echo ""
+  fi
+
+  # Cold (inactive) specs
+  echo -e "${BOLD}Cold (inactive):${NC}"
+  local active_ids
+  active_ids="$(_get_core_ids; echo "$activated")"
+  while IFS= read -r id; do
+    if ! echo "$active_ids" | grep -qx "$id"; then
+      local type
+      type="$(_spec_type "$id")"
+      printf "  ${DIM}○${NC} "
+      _format_type "$type"
+      printf "  %s\n" "$id"
+    fi
+  done < <(_get_all_ids)
+}
+
+cmd_list() {
+  _check_deps
+  _check_library
+
+  local tag_filter=""
+  local type_filter=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --tag)  tag_filter="$2"; shift 2 ;;
+      --type) type_filter="$2"; shift 2 ;;
+      *)      shift ;;
+    esac
+  done
+
+  local jq_filter='.specs[]'
+  if [[ -n "$tag_filter" ]]; then
+    jq_filter="$jq_filter | select(.tags | index(\"$tag_filter\"))"
+  fi
+  if [[ -n "$type_filter" ]]; then
+    jq_filter="$jq_filter | select(.type == \"$type_filter\")"
+  fi
+
+  jq -r "$jq_filter | [.type, .id, .description, (.core | tostring)] | @tsv" "$LIBRARY_JSON" | \
+    while IFS=$'\t' read -r type id desc core; do
+      printf "  "
+      _format_type "$type"
+      if [[ "$core" == "true" ]]; then
+        printf "  ${BOLD}%-35s${NC} %s ${GREEN}[CORE]${NC}\n" "$id" "$desc"
+      else
+        printf "  %-35s %s\n" "$id" "$desc"
+      fi
+    done
+}
+
+cmd_search() {
+  _check_deps
+  _check_library
+
+  local query="${1:-}"
+  if [[ -z "$query" ]]; then
+    echo -e "${RED}Usage: specs search <query>${NC}" >&2
+    exit 1
+  fi
+
+  local lquery
+  lquery="$(echo "$query" | tr '[:upper:]' '[:lower:]')"
+
+  jq -r '.specs[] | [.type, .id, .description, (.core | tostring), (.tags | join(","))] | @tsv' "$LIBRARY_JSON" | \
+    while IFS=$'\t' read -r type id desc core tags; do
+      local searchable
+      searchable="$(echo "$id $desc $tags" | tr '[:upper:]' '[:lower:]')"
+      if [[ "$searchable" == *"$lquery"* ]]; then
+        printf "  "
+        _format_type "$type"
+        if [[ "$core" == "true" ]]; then
+          printf "  ${BOLD}%-35s${NC} %s ${GREEN}[CORE]${NC}\n" "$id" "$desc"
+        else
+          printf "  %-35s %s\n" "$id" "$desc"
+        fi
+      fi
+    done
+}
+
+cmd_activate() {
+  _check_deps
+  _check_library
+
+  local use_global=false
+  local dry_run=false
+  local ids=()
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --global)  use_global=true; shift ;;
+      --dry-run) dry_run=true; shift ;;
+      *)         ids+=("$1"); shift ;;
+    esac
+  done
+
+  if [[ ${#ids[@]} -eq 0 ]]; then
+    echo -e "${RED}Usage: specs activate <spec-id> [spec-id...]${NC}" >&2
+    exit 1
+  fi
+
+  local manifest
+  if [[ "$use_global" == true ]]; then
+    manifest="$GLOBAL_MANIFEST"
+  else
+    manifest="$(_manifest_path)"
+  fi
+
+  for id in "${ids[@]}"; do
+    if ! _spec_exists "$id"; then
+      echo -e "${RED}✗ Not found: $id${NC}" >&2
+      continue
+    fi
+
+    if _spec_is_core "$id"; then
+      echo -e "${YELLOW}⊘ Already core (always active): $id${NC}"
+      continue
+    fi
+
+    local type
+    type="$(_spec_type "$id")"
+
+    if [[ "$dry_run" == true ]]; then
+      echo -e "${DIM}Would activate: $id ($type)${NC}"
+      continue
+    fi
+
+    _add_to_manifest "$manifest" "$id"
+    _create_symlink "$id"
+    echo -e "${GREEN}✓ Activated: $id ($type)${NC}"
+  done
+
+  if [[ "$dry_run" == false ]]; then
+    echo -e "${DIM}Manifest updated: $manifest${NC}"
+    echo -e "${DIM}Symlinks created in: ${TOOL_DIRS[*]}${NC}"
+  fi
+}
+
+cmd_deactivate() {
+  _check_deps
+  _check_library
+
+  local use_global=false
+  local ids=()
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --global) use_global=true; shift ;;
+      *)        ids+=("$1"); shift ;;
+    esac
+  done
+
+  if [[ ${#ids[@]} -eq 0 ]]; then
+    echo -e "${RED}Usage: specs deactivate <spec-id> [spec-id...]${NC}" >&2
+    exit 1
+  fi
+
+  local manifest
+  if [[ "$use_global" == true ]]; then
+    manifest="$GLOBAL_MANIFEST"
+  else
+    manifest="$(_manifest_path)"
+  fi
+
+  for id in "${ids[@]}"; do
+    if ! _spec_exists "$id"; then
+      echo -e "${RED}✗ Not found: $id${NC}" >&2
+      continue
+    fi
+
+    if _spec_is_core "$id"; then
+      echo -e "${YELLOW}⊘ Cannot deactivate core spec: $id${NC}"
+      continue
+    fi
+
+    local type
+    type="$(_spec_type "$id")"
+    _remove_from_manifest "$manifest" "$id"
+    _remove_symlink "$id"
+    echo -e "${GREEN}✓ Deactivated: $id ($type)${NC}"
+  done
+}
+
+cmd_auto() {
+  _check_deps
+  _check_library
+
+  local quiet=false
+  local dry_run=false
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --quiet)   quiet=true; shift ;;
+      --dry-run) dry_run=true; shift ;;
+      *)         shift ;;
+    esac
+  done
+
+  local project_root
+  project_root="$(_project_root)"
+  if [[ -z "$project_root" ]]; then
+    [[ "$quiet" == false ]] && echo -e "${DIM}Not in a git repo — skipping auto-detection.${NC}"
+    return 0
+  fi
+
+  local manifest
+  manifest="$(_manifest_path)"
+  _ensure_manifest "$manifest"
+
+  local activated_new=()
+
+  # Get currently active IDs (core + manifest)
+  local active_ids
+  active_ids="$( { _get_core_ids; _get_activated "$manifest"; } )"
+
+  # Check triggers for each spec
+  while IFS=$'\t' read -r id trigger_files trigger_exts; do
+    # Skip already active
+    if echo "$active_ids" | grep -qx "$id"; then
+      continue
+    fi
+
+    local matched=false
+
+    # Check trigger files
+    if [[ -n "$trigger_files" && "$trigger_files" != "null" ]]; then
+      while IFS=',' read -ra files; do
+        for f in "${files[@]}"; do
+          f="$(echo "$f" | tr -d '[:space:]')"
+          [[ -z "$f" ]] && continue
+          # Handle directory triggers (ending with /)
+          if [[ "$f" == */ ]]; then
+            [[ -d "$project_root/$f" ]] && matched=true && break
+          else
+            # Also check glob patterns like *.Rproj
+            if [[ "$f" == *'*'* ]]; then
+              # shellcheck disable=SC2086
+              ls "$project_root"/$f &>/dev/null && matched=true && break
+            else
+              [[ -e "$project_root/$f" ]] && matched=true && break
+            fi
+          fi
+        done
+        [[ "$matched" == true ]] && break
+      done <<< "$trigger_files"
+    fi
+
+    # Check trigger extensions (shallow: root + src/)
+    if [[ "$matched" == false && -n "$trigger_exts" && "$trigger_exts" != "null" ]]; then
+      while IFS=',' read -ra exts; do
+        for ext in "${exts[@]}"; do
+          ext="$(echo "$ext" | tr -d '[:space:]')"
+          [[ -z "$ext" ]] && continue
+          # Remove leading dot for glob
+          local ext_glob="${ext#.}"
+          # shellcheck disable=SC2086
+          if ls "$project_root"/*."$ext_glob" &>/dev/null || \
+             ls "$project_root"/src/*."$ext_glob" &>/dev/null; then
+            matched=true
+            break
+          fi
+        done
+        [[ "$matched" == true ]] && break
+      done <<< "$trigger_exts"
+    fi
+
+    if [[ "$matched" == true ]]; then
+      activated_new+=("$id")
+    fi
+  done < <(jq -r '.specs[] | select(.core == false and .triggers != {} and .triggers != null) | [.id, (.triggers.files // [] | join(",")), (.triggers.extensions // [] | join(","))] | @tsv' "$LIBRARY_JSON")
+
+  if [[ ${#activated_new[@]} -eq 0 ]]; then
+    [[ "$quiet" == false ]] && echo -e "${DIM}No changes (specs already active or no triggers matched)${NC}"
+    return 0
+  fi
+
+  if [[ "$dry_run" == true ]]; then
+    echo -e "${BOLD}Would activate ${#activated_new[@]} specs:${NC}"
+    for id in "${activated_new[@]}"; do
+      local type
+      type="$(_spec_type "$id")"
+      printf "  "
+      _format_type "$type"
+      printf "  %s\n" "$id"
+    done
+    return 0
+  fi
+
+  # Activate new specs
+  for id in "${activated_new[@]}"; do
+    _add_to_manifest "$manifest" "$id"
+    _create_symlink "$id"
+  done
+
+  if [[ "$quiet" == false ]]; then
+    echo -e "${GREEN}Activated ${#activated_new[@]} new specs:${NC} ${activated_new[*]}"
+  fi
+}
+
+cmd_sync() {
+  _check_deps
+  _check_library
+
+  local quiet=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --quiet) quiet=true; shift ;;
+      *)       shift ;;
+    esac
+  done
+
+  # Clear existing symlinks in tool dirs (only symlinks, not real files/dirs)
+  for tool_dir in "${TOOL_DIRS[@]}"; do
+    for subdir in skills commands agents; do
+      local dir="$tool_dir/$subdir"
+      [[ -d "$dir" ]] || continue
+      # Remove symlinks only
+      find "$dir" -maxdepth 1 -type l -delete 2>/dev/null || true
+    done
+  done
+
+  # Also clean broken symlinks
+  for tool_dir in "${TOOL_DIRS[@]}"; do
+    for subdir in skills commands agents; do
+      local dir="$tool_dir/$subdir"
+      [[ -d "$dir" ]] || continue
+      # Find broken symlinks (symlinks pointing to nonexistent targets)
+      find -L "$dir" -maxdepth 1 -type l -delete 2>/dev/null || true
+    done
+  done
+
+  local count=0
+
+  # Activate core specs
+  while IFS= read -r id; do
+    _create_symlink "$id" && ((count++)) || true
+  done < <(_get_core_ids)
+
+  # Activate manifest specs (try project manifest first, then global)
+  local manifest
+  manifest="$(_manifest_path)"
+  _ensure_manifest "$manifest"
+
+  while IFS= read -r id; do
+    [[ -z "$id" ]] && continue
+    if _spec_exists "$id"; then
+      _create_symlink "$id" && ((count++)) || true
+    else
+      [[ "$quiet" == false ]] && echo -e "${YELLOW}⚠ Spec in manifest but not in library: $id${NC}" >&2
+    fi
+  done < <(_get_activated "$manifest")
+
+  # Also apply global manifest if we're in a project
+  if [[ "$manifest" != "$GLOBAL_MANIFEST" && -f "$GLOBAL_MANIFEST" ]]; then
+    while IFS= read -r id; do
+      [[ -z "$id" ]] && continue
+      if _spec_exists "$id"; then
+        _create_symlink "$id" && ((count++)) || true
+      fi
+    done < <(_get_activated "$GLOBAL_MANIFEST")
+  fi
+
+  [[ "$quiet" == false ]] && echo -e "${GREEN}✓ $count symlinks created across ${#TOOL_DIRS[@]} tool directories${NC}"
+}
+
+cmd_reset() {
+  _check_deps
+  _check_library
+
+  local manifest
+  manifest="$(_manifest_path)"
+  _ensure_manifest "$manifest"
+
+  local activated
+  activated="$(_get_activated "$manifest")"
+  local removed=0
+
+  # Remove non-core symlinks
+  while IFS= read -r id; do
+    [[ -z "$id" ]] && continue
+    _remove_symlink "$id"
+    removed=$((removed + 1))
+  done <<< "$activated"
+
+  # Clear manifest
+  echo '{"activated":[]}' > "$manifest"
+
+  echo -e "${GREEN}Reset to core-only specs. Removed $removed activated specs.${NC}"
+}
+
+# --- Main ---
+
+main() {
+  local subcommand="${1:-status}"
+
+  case "$subcommand" in
+    status)     shift 2>/dev/null || true; cmd_status "$@" ;;
+    list)       shift; cmd_list "$@" ;;
+    search)     shift; cmd_search "$@" ;;
+    activate)   shift; cmd_activate "$@" ;;
+    deactivate) shift; cmd_deactivate "$@" ;;
+    auto)       shift; cmd_auto "$@" ;;
+    sync)       shift; cmd_sync "$@" ;;
+    reset)      shift 2>/dev/null || true; cmd_reset "$@" ;;
+    help|--help|-h) cmd_help ;;
+    *)
+      echo -e "${RED}Unknown subcommand: $subcommand${NC}" >&2
+      echo "Run 'specs help' for usage." >&2
+      exit 1
+      ;;
+  esac
+}
+
+main "$@"
