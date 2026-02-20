@@ -60,6 +60,10 @@ chmod +x "$HOME/.local/bin/machine-sync"
 cp "$REPO/bin/specs-sync" "$HOME/.local/bin/specs-sync"
 chmod +x "$HOME/.local/bin/specs-sync"
 
+# Cleanup renamed binaries
+rm -f "$HOME/.local/bin/machine-sync-remote"
+rm -f "$HOME/.local/bin/specs"
+
 # --- Artifacts repo ---
 echo "==> Syncing artifacts"
 artifact-sync

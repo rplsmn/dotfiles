@@ -38,6 +38,8 @@ chmod +x "$HOME/.local/bin/specs-sync"
 echo "==> Syncing specs to library"
 LIBRARY_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/llm-specs"
 mkdir -p "$LIBRARY_DIR"
+# Clean and repopulate cold library (removes stale entries)
+rm -rf "$LIBRARY_DIR/skills" "$LIBRARY_DIR/commands" "$LIBRARY_DIR/agents"
 cp -r "$REPO_DIR/skills" "$LIBRARY_DIR/"
 cp -r "$REPO_DIR/commands" "$LIBRARY_DIR/"
 cp -r "$REPO_DIR/agents" "$LIBRARY_DIR/"
@@ -81,5 +83,9 @@ mkdir -p "$HOME/.local/bin"
 cp "$REPO_DIR/bin/artifact-sync" "$HOME/.local/bin/"
 sed "s|^REPO=.*|REPO=\"$REPO_DIR\"|" "$REPO_DIR/bin/machine-sync" > "$HOME/.local/bin/machine-sync"
 chmod +x "$HOME/.local/bin/machine-sync"
+
+# --- Cleanup renamed binaries ---
+rm -f "$HOME/.local/bin/machine-sync-remote"
+rm -f "$HOME/.local/bin/specs"
 
 echo "==> Done! Open a new terminal or run: source ~/.bashrc"

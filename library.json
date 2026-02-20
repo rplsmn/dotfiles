@@ -4,342 +4,549 @@
     {
       "id": "adr-writing",
       "type": "skill",
-      "name": "ADR Writing",
-      "description": "Write Architecture Decision Records (ADRs) for any project. Use when evaluating technology choices, architectural changes, or significant design decisions.",
+      "name": "adr-writing",
+      "description": "Write Architecture Decision Records (ADRs) for any project. Use when evaluating technology choices, architectural changes, or significant design decisions. Covers research phase, human+LLM cost framing, structure, and evidence standards.",
       "core": false,
-      "tags": ["adr", "architecture", "decisions"],
+      "tags": [
+        "adr",
+        "architecture",
+        "decisions"
+      ],
       "triggers": {}
     },
     {
       "id": "customizing-vectors-r",
       "type": "skill",
-      "name": "Customizing Vectors R",
-      "description": "Type-stable vector operations and custom vector classes using vctrs.",
+      "name": "customizing-vectors-r",
+      "description": "|",
       "core": false,
-      "tags": ["r", "vctrs", "vectors", "types"],
+      "tags": [
+        "r",
+        "vctrs",
+        "vectors",
+        "types"
+      ],
       "triggers": {
-        "files": ["DESCRIPTION", "NAMESPACE", "*.Rproj"],
-        "extensions": [".R", ".Rmd", ".qmd"]
+        "files": [
+          "DESCRIPTION",
+          "NAMESPACE",
+          "*.Rproj"
+        ],
+        "extensions": [
+          ".R",
+          ".Rmd",
+          ".qmd"
+        ]
       }
-    },
-    {
-      "id": "shiny-modules-share-data-r6",
-      "type": "skill",
-      "name": "Shiny Modules Share Data R6",
-      "description": "Use when multiple modules need to read and write shared state using R6 classes.",
-      "core": false,
-      "tags": ["r", "shiny", "modules", "r6", "reactive"],
-      "triggers": {
-        "files": ["DESCRIPTION", "NAMESPACE", "*.Rproj"]
-      }
-    },
-    {
-      "id": "teradata-tpt-cli",
-      "type": "skill",
-      "name": "Teradata TPT CLI",
-      "description": "Use when working on a Teradata Database and importing/exporting data with the TPT utility.",
-      "core": false,
-      "tags": ["teradata", "tpt", "database", "etl"],
-      "triggers": {}
     },
     {
       "id": "designing-oop-r",
       "type": "skill",
-      "name": "Designing OOP R",
-      "description": "Object-oriented programming in R: S7, S3, S4, and vctrs class design.",
+      "name": "designing-oop-r",
+      "description": "|",
       "core": false,
-      "tags": ["r", "oop", "s7", "s3", "s4", "classes"],
+      "tags": [
+        "r",
+        "oop",
+        "s7",
+        "s3",
+        "s4",
+        "classes"
+      ],
       "triggers": {
-        "files": ["DESCRIPTION", "NAMESPACE", "*.Rproj"],
-        "extensions": [".R", ".Rmd", ".qmd"]
+        "files": [
+          "DESCRIPTION",
+          "NAMESPACE",
+          "*.Rproj"
+        ],
+        "extensions": [
+          ".R",
+          ".Rmd",
+          ".qmd"
+        ]
       }
     },
     {
       "id": "developing-packages-r",
       "type": "skill",
-      "name": "Developing Packages R",
-      "description": "Building robust R packages with modern tidyverse patterns.",
+      "name": "developing-packages-r",
+      "description": "|",
       "core": false,
-      "tags": ["r", "packages", "devtools", "api"],
+      "tags": [
+        "r",
+        "packages",
+        "devtools",
+        "api"
+      ],
       "triggers": {
-        "files": ["DESCRIPTION", "NAMESPACE", "*.Rproj"],
-        "extensions": [".R", ".Rmd", ".qmd"]
+        "files": [
+          "DESCRIPTION",
+          "NAMESPACE",
+          "*.Rproj"
+        ],
+        "extensions": [
+          ".R",
+          ".Rmd",
+          ".qmd"
+        ]
       }
     },
     {
       "id": "dispatching-parallel-agents",
       "type": "skill",
-      "name": "Dispatching Parallel Agents",
-      "description": "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies.",
+      "name": "dispatching-parallel-agents",
+      "description": "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies",
       "core": false,
-      "tags": ["parallel", "agents", "concurrency"],
+      "tags": [
+        "parallel",
+        "agents",
+        "concurrency"
+      ],
       "triggers": {}
     },
     {
       "id": "email-drafter",
       "type": "skill",
-      "name": "Email Drafter",
-      "description": "Professional email composition for business communication across various contexts.",
+      "name": "email-drafter",
+      "description": "|",
       "core": false,
-      "tags": ["email", "writing", "professional"],
+      "tags": [
+        "email",
+        "writing",
+        "professional"
+      ],
       "triggers": {}
     },
     {
       "id": "executing-plans",
       "type": "skill",
-      "name": "Executing Plans",
-      "description": "Use when you have a written implementation plan to execute in a separate session with review checkpoints.",
+      "name": "executing-plans",
+      "description": "Use when you have a written implementation plan to execute in a separate session with review checkpoints",
       "core": false,
-      "tags": ["plans", "execution", "checkpoints"],
+      "tags": [
+        "plans",
+        "execution",
+        "checkpoints"
+      ],
       "triggers": {}
     },
     {
       "id": "finishing-a-development-branch",
       "type": "skill",
-      "name": "Finishing a Development Branch",
-      "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work.",
+      "name": "finishing-a-development-branch",
+      "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup",
       "core": false,
-      "tags": ["git", "branch", "merge", "pr"],
+      "tags": [
+        "git",
+        "branch",
+        "merge",
+        "pr"
+      ],
       "triggers": {}
     },
     {
       "id": "metaprogramming-rlang",
       "type": "skill",
-      "name": "Metaprogramming rlang",
-      "description": "Tidy evaluation and programmatic tidyverse patterns using rlang.",
+      "name": "metaprogramming-rlang",
+      "description": "|",
       "core": false,
-      "tags": ["r", "rlang", "tidy-eval", "metaprogramming"],
+      "tags": [
+        "r",
+        "rlang",
+        "tidy-eval",
+        "metaprogramming"
+      ],
       "triggers": {
-        "files": ["DESCRIPTION", "NAMESPACE", "*.Rproj"],
-        "extensions": [".R", ".Rmd", ".qmd"]
+        "files": [
+          "DESCRIPTION",
+          "NAMESPACE",
+          "*.Rproj"
+        ],
+        "extensions": [
+          ".R",
+          ".Rmd",
+          ".qmd"
+        ]
       }
     },
     {
       "id": "optimizing-r",
       "type": "skill",
-      "name": "Optimizing R",
-      "description": "R performance profiling, benchmarking, and optimization strategies.",
+      "name": "optimizing-r",
+      "description": "|",
       "core": false,
-      "tags": ["r", "performance", "profiling", "benchmarking"],
+      "tags": [
+        "r",
+        "performance",
+        "profiling",
+        "benchmarking"
+      ],
       "triggers": {
-        "files": ["DESCRIPTION", "NAMESPACE", "*.Rproj"],
-        "extensions": [".R", ".Rmd", ".qmd"]
+        "files": [
+          "DESCRIPTION",
+          "NAMESPACE",
+          "*.Rproj"
+        ],
+        "extensions": [
+          ".R",
+          ".Rmd",
+          ".qmd"
+        ]
       }
     },
     {
       "id": "receiving-code-review",
       "type": "skill",
-      "name": "Receiving Code Review",
-      "description": "Use when receiving code review feedback, before implementing suggestions.",
+      "name": "receiving-code-review",
+      "description": "Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not performative agreement or blind implementation",
       "core": false,
-      "tags": ["review", "feedback", "code-quality"],
+      "tags": [
+        "review",
+        "feedback",
+        "code-quality"
+      ],
       "triggers": {}
     },
     {
       "id": "requesting-code-review",
       "type": "skill",
-      "name": "Requesting Code Review",
-      "description": "Use when completing tasks, implementing major features, or before merging to verify work meets requirements.",
+      "name": "requesting-code-review",
+      "description": "Use when completing tasks, implementing major features, or before merging to verify work meets requirements",
       "core": false,
-      "tags": ["review", "pr", "quality"],
+      "tags": [
+        "review",
+        "pr",
+        "quality"
+      ],
       "triggers": {}
+    },
+    {
+      "id": "shiny-modules-share-data-r6",
+      "type": "skill",
+      "name": "shiny-modules-share-data-r6",
+      "description": "|",
+      "core": false,
+      "tags": [
+        "r",
+        "shiny",
+        "modules",
+        "r6",
+        "reactive"
+      ],
+      "triggers": {
+        "files": [
+          "DESCRIPTION",
+          "NAMESPACE",
+          "*.Rproj"
+        ]
+      }
     },
     {
       "id": "subagent-driven-development",
       "type": "skill",
-      "name": "Subagent-Driven Development",
-      "description": "Use when executing implementation plans with independent tasks in the current session.",
+      "name": "subagent-driven-development",
+      "description": "Use when executing implementation plans with independent tasks in the current session",
       "core": false,
-      "tags": ["agents", "subagent", "delegation"],
+      "tags": [
+        "agents",
+        "subagent",
+        "delegation"
+      ],
       "triggers": {}
     },
     {
       "id": "systematic-debugging",
       "type": "skill",
-      "name": "Systematic Debugging",
-      "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes.",
+      "name": "systematic-debugging",
+      "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes",
       "core": true,
-      "tags": ["debugging", "bugs", "root-cause"],
+      "tags": [
+        "debugging",
+        "bugs",
+        "root-cause"
+      ],
       "triggers": {}
     },
     {
       "id": "technical-writer",
       "type": "skill",
-      "name": "Technical Writer",
-      "description": "Creates clear documentation, API references, guides, and technical content for developers and users.",
+      "name": "technical-writer",
+      "description": "|",
       "core": false,
-      "tags": ["documentation", "writing", "technical"],
+      "tags": [
+        "documentation",
+        "writing",
+        "technical"
+      ],
+      "triggers": {}
+    },
+    {
+      "id": "teradata-tpt-cli",
+      "type": "skill",
+      "name": "teradata-tpt-cli",
+      "description": "Use when exporting working on a Teradata Database and importing / exporting data froma nd to the disk with the TPT utility.",
+      "core": false,
+      "tags": [
+        "teradata",
+        "tpt",
+        "database",
+        "etl"
+      ],
       "triggers": {}
     },
     {
       "id": "test-driven-development",
       "type": "skill",
-      "name": "Test-Driven Development",
-      "description": "Use when implementing any feature or bugfix, before writing implementation code.",
+      "name": "test-driven-development",
+      "description": "Use when implementing any feature or bugfix, before writing implementation code",
       "core": true,
-      "tags": ["tdd", "testing", "red-green-refactor"],
+      "tags": [
+        "tdd",
+        "testing",
+        "red-green-refactor"
+      ],
       "triggers": {}
     },
     {
       "id": "using-git-worktrees",
       "type": "skill",
-      "name": "Using Git Worktrees",
-      "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans.",
+      "name": "using-git-worktrees",
+      "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - creates isolated git worktrees with smart directory selection and safety verification",
       "core": false,
-      "tags": ["git", "worktrees", "isolation"],
+      "tags": [
+        "git",
+        "worktrees",
+        "isolation"
+      ],
       "triggers": {}
     },
     {
       "id": "using-superpowers",
       "type": "skill",
-      "name": "Using Superpowers",
-      "description": "Use when starting any conversation - establishes how to find and use skills.",
+      "name": "using-superpowers",
+      "description": "Use when starting any conversation - establishes how to find and use skills, requiring Skill tool invocation before ANY response including clarifying questions",
       "core": true,
-      "tags": ["skills", "discovery", "activation"],
+      "tags": [
+        "skills",
+        "discovery",
+        "activation"
+      ],
       "triggers": {}
     },
     {
       "id": "verification-before-completion",
       "type": "skill",
-      "name": "Verification Before Completion",
-      "description": "Use when about to claim work is complete, fixed, or passing, before committing or creating PRs.",
+      "name": "verification-before-completion",
+      "description": "Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always",
       "core": true,
-      "tags": ["verification", "done", "quality"],
+      "tags": [
+        "verification",
+        "done",
+        "quality"
+      ],
       "triggers": {}
     },
     {
       "id": "writing-plans",
       "type": "skill",
-      "name": "Writing Plans",
-      "description": "Use when you have a spec or requirements for a multi-step task, before touching code.",
+      "name": "writing-plans",
+      "description": "Use when you have a spec or requirements for a multi-step task, before touching code",
       "core": true,
-      "tags": ["planning", "implementation", "tasks"],
+      "tags": [
+        "planning",
+        "implementation",
+        "tasks"
+      ],
       "triggers": {}
     },
     {
       "id": "writing-skills",
       "type": "skill",
-      "name": "Writing Skills",
-      "description": "Use when creating new skills, editing existing skills, or verifying skills work before deployment.",
+      "name": "writing-skills",
+      "description": "Use when creating new skills, editing existing skills, or verifying skills work before deployment",
       "core": true,
-      "tags": ["skills", "creation", "tdd"],
+      "tags": [
+        "skills",
+        "creation",
+        "tdd"
+      ],
       "triggers": {}
     },
     {
       "id": "writing-tidyverse-r",
       "type": "skill",
-      "name": "Writing Tidyverse R",
-      "description": "Modern tidyverse patterns, style guide, and migration guidance for R development.",
+      "name": "writing-tidyverse-r",
+      "description": "|",
       "core": false,
-      "tags": ["r", "tidyverse", "data-wrangling", "style"],
+      "tags": [
+        "r",
+        "tidyverse",
+        "data-wrangling",
+        "style"
+      ],
       "triggers": {
-        "files": ["DESCRIPTION", "NAMESPACE", "*.Rproj"],
-        "extensions": [".R", ".Rmd", ".qmd"]
+        "files": [
+          "DESCRIPTION",
+          "NAMESPACE",
+          "*.Rproj"
+        ],
+        "extensions": [
+          ".R",
+          ".Rmd",
+          ".qmd"
+        ]
       }
     },
     {
       "id": "archive-artifacts",
       "type": "command",
-      "name": "Archive Artifacts",
-      "description": "Archive old stale LLM files in the global artifacts folder.",
+      "name": "archive-artifacts",
+      "description": "Archive old stale LLM files in the global artifacts folder",
       "core": false,
-      "tags": ["artifacts", "cleanup", "archive"],
+      "tags": [
+        "artifacts",
+        "cleanup",
+        "archive"
+      ],
       "triggers": {}
     },
     {
       "id": "brainstorm",
       "type": "command",
-      "name": "Brainstorm",
-      "description": "Explores requirements and design before implementation.",
+      "name": "brainstorm",
+      "description": "\"You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores requirements and design before implementation.\"",
       "core": false,
-      "tags": ["brainstorming", "design", "creative"],
+      "tags": [
+        "brainstorming",
+        "design",
+        "creative"
+      ],
       "triggers": {}
     },
     {
       "id": "execute-plan",
       "type": "command",
-      "name": "Execute Plan",
-      "description": "Execute plan in batches with review checkpoints.",
+      "name": "execute-plan",
+      "description": "Execute plan in batches with review checkpoints",
       "core": false,
-      "tags": ["plans", "execution", "batches"],
+      "tags": [
+        "plans",
+        "execution",
+        "batches"
+      ],
+      "triggers": {}
+    },
+    {
+      "id": "generate-rpkg-consumer-skill",
+      "type": "command",
+      "name": "generate-rpkg-consumer-skill",
+      "description": "Generate a condensed consumer skill for a package/library/tool with an API",
+      "core": false,
+      "tags": [],
       "triggers": {}
     },
     {
       "id": "implementing-team",
       "type": "command",
-      "name": "Implementing Team",
-      "description": "Dispatch an implementation team: messengers coordinate coders and reviewers to implement tasks from existing plans.",
+      "name": "implementing-team",
+      "description": "\"Dispatch an implementation team: Haiku messengers coordinate Opus 4.6 coders (TDD, lean) and Opus 4.6 reviewers to implement tasks from existing plans.\"",
       "core": false,
-      "tags": ["agents", "team", "implementation"],
+      "tags": [
+        "agents",
+        "team",
+        "implementation"
+      ],
       "triggers": {}
     },
     {
       "id": "planning-team",
       "type": "command",
-      "name": "Planning Team",
-      "description": "Dispatch a planning team: messengers coordinate planners and reviewers to produce reviewed implementation plans.",
+      "name": "planning-team",
+      "description": "\"Dispatch a planning team: Haiku messengers coordinate Opus planners and Opus reviewers to produce reviewed implementation plans for one or more tasks.\"",
       "core": false,
-      "tags": ["agents", "team", "planning"],
-      "triggers": {}
-    },
-    {
-      "id": "solve-issue",
-      "type": "command",
-      "name": "Solve Issue",
-      "description": "Solve a GitHub issue end-to-end: plan, implement (TDD), review, open PR.",
-      "core": false,
-      "tags": ["github", "issues", "tdd", "pr"],
-      "triggers": {
-        "files": [".github/"]
-      }
-    },
-    {
-      "id": "triage-issues",
-      "type": "command",
-      "name": "Triage Issues",
-      "description": "Triage and solve GitHub issues end-to-end with subagents.",
-      "core": false,
-      "tags": ["github", "issues", "triage"],
-      "triggers": {
-        "files": [".github/"]
-      }
-    },
-    {
-      "id": "generate-consumer-skill",
-      "type": "command",
-      "name": "Generate Consumer Skill",
-      "description": "Generate a condensed consumer skill package for an R package, suitable for LLM agents.",
-      "core": false,
-      "tags": ["skills", "generation", "packages"],
+      "tags": [
+        "agents",
+        "team",
+        "planning"
+      ],
       "triggers": {}
     },
     {
       "id": "solve-batch",
       "type": "command",
-      "name": "Solve Batch",
-      "description": "Solve multiple independent GitHub issues in parallel using git worktrees.",
+      "name": "solve-batch",
+      "description": "\"Solve multiple independent GitHub issues in parallel using git worktrees. Dispatches one agent per issue, then blind cross-reviews.\"",
       "core": false,
-      "tags": ["github", "issues", "parallel", "worktrees"],
+      "tags": [
+        "github",
+        "issues",
+        "parallel",
+        "worktrees"
+      ],
       "triggers": {
-        "files": [".github/"]
+        "files": [
+          ".github/"
+        ]
+      }
+    },
+    {
+      "id": "solve-issue",
+      "type": "command",
+      "name": "solve-issue",
+      "description": "\"Solve a GitHub issue end-to-end: plan, implement (TDD), review, open PR. Uses subagents for each phase.\"",
+      "core": false,
+      "tags": [
+        "github",
+        "issues",
+        "tdd",
+        "pr"
+      ],
+      "triggers": {
+        "files": [
+          ".github/"
+        ]
+      }
+    },
+    {
+      "id": "triage-issues",
+      "type": "command",
+      "name": "triage-issues",
+      "description": "\"Solve a GitHub issue end-to-end: plan, implement (TDD), review, open PR. Uses subagents for each phase.\"",
+      "core": false,
+      "tags": [
+        "github",
+        "issues",
+        "triage"
+      ],
+      "triggers": {
+        "files": [
+          ".github/"
+        ]
       }
     },
     {
       "id": "write-plan",
       "type": "command",
-      "name": "Write Plan",
-      "description": "Create detailed implementation plan with bite-sized tasks.",
+      "name": "write-plan",
+      "description": "Create detailed implementation plan with bite-sized tasks",
       "core": false,
-      "tags": ["planning", "tasks"],
+      "tags": [
+        "planning",
+        "tasks"
+      ],
       "triggers": {}
     },
     {
       "id": "code-reviewer",
       "type": "agent",
-      "name": "Code Reviewer",
-      "description": "Senior Code Reviewer for validating completed project steps against plans and coding standards.",
+      "name": "code-reviewer",
+      "description": "|",
       "core": true,
-      "tags": ["review", "quality", "standards"],
+      "tags": [
+        "review",
+        "quality",
+        "standards"
+      ],
       "triggers": {}
     }
   ]

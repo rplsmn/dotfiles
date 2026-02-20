@@ -1,4 +1,9 @@
-# /generate-consumer-skill
+---
+name: generate-rpkg-consumer-skill
+description: Generate a condensed consumer skill for a package/library/tool with an API
+---
+
+# generate-rpkg-consumer-skill
 
 Generate a condensed consumer skill package for this R package, suitable for LLM agents helping users integrate this library.
 Write it to the root of the repo, and suggest the user move it to .claude / .github or in the global folders.
@@ -25,12 +30,14 @@ Create the following files in the output directory:
 #### SKILL.md (~300-500 lines)
 The main skill file with:
 
+(NOTE: ACTUALLY MAKE IT A YAML FRONTMATTER, DON'T COPY PASTE THIS BLOCK WITH THE BACKTICKS OR THE SKILL WON'T WORK)
+
 ```markdown
 # <PackageName> Consumer Skill
 
 ## Metadata
 ```yaml
-name: <package>-consumer
+name: r-<package>-consumer
 description: <one-line description focused on when to use the skill, not what it does>
 ```
 
@@ -116,7 +123,7 @@ After generating files:
 ## Example Invocation
 
 ```
-/generate-consumer-skill
+/generate-rpkg-consumer-skill
 ```
 
 ## Template for Information Extraction
