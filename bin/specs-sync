@@ -277,7 +277,6 @@ Repo init/update (project-local dirs — copies):
   update          Refresh project specs from cold library
   activate        Activate specs (project-local copy, or --global symlink)
   deactivate      Remove specs from project-local dirs
-  auto            Auto-detect and copy missing specs to project
   reset           Remove non-core specs from project; clear manifest
 
 Discovery:
@@ -290,15 +289,14 @@ Options:
   --tag TAG       Filter by tag (list subcommand)
   --type TYPE     Filter by type: skill, command, agent (list subcommand)
   --global        Symlink to global dirs instead of project-local (activate)
-  --quiet         Suppress output (auto/sync subcommands)
-  --dry-run       Show what would happen without doing it (auto/init subcommands)
+  --quiet         Suppress output (sync subcommand)
+  --dry-run       Show what would happen without doing it (init subcommand)
 
 Examples:
   specs-sync init                    # initialize project with matching specs
   specs-sync update                  # refresh specs from cold library
   specs-sync activate solve-issue    # copy a spec into the project
   specs-sync activate --global tdd   # symlink to global dirs
-  specs-sync auto                    # auto-detect and copy missing specs
   specs-sync sync                    # rebuild global core symlinks
   specs-sync reset                   # return project to core-only
   specs-sync generate-library          # regenerate library.json from disk
@@ -556,131 +554,6 @@ cmd_deactivate() {
   done
 }
 
-cmd_auto() {
-  _check_deps
-  _check_library
-
-  local quiet=false
-  local dry_run=false
-
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --quiet)   quiet=true; shift ;;
-      --dry-run) dry_run=true; shift ;;
-      *)         shift ;;
-    esac
-  done
-
-  local project_root
-  project_root="$(_project_root)"
-  if [[ -z "$project_root" ]]; then
-    if [[ "$quiet" == false ]]; then
-      echo -e "${DIM}Not in a git repo — skipping auto-detection.${NC}"
-    fi
-    return 0
-  fi
-
-  local manifest
-  manifest="$(_manifest_path)"
-  _ensure_manifest "$manifest"
-
-  local activated_new=()
-
-  # Get currently active IDs (core + manifest)
-  local active_ids
-  active_ids="$( { _get_core_ids; _get_activated "$manifest"; } )"
-
-  # Check triggers for each spec
-  while IFS=$'\t' read -r id trigger_files trigger_exts; do
-    # Skip already active
-    if echo "$active_ids" | grep -qx "$id"; then
-      # Already in manifest — but only copy if not present in project
-      if ! _spec_exists_in_project "$id" "$project_root"; then
-        _copy_spec_to_project "$id" "$project_root" 2>/dev/null || true
-      fi
-      continue
-    fi
-
-    local matched=false
-
-    # Check trigger files
-    if [[ -n "$trigger_files" && "$trigger_files" != "null" ]]; then
-      while IFS=',' read -ra files; do
-        for f in "${files[@]}"; do
-          f="$(echo "$f" | tr -d '[:space:]')"
-          [[ -z "$f" ]] && continue
-          if [[ "$f" == */ ]]; then
-            [[ -d "$project_root/$f" ]] && matched=true && break
-          else
-            if [[ "$f" == *'*'* ]]; then
-              # shellcheck disable=SC2086
-              ls "$project_root"/$f &>/dev/null && matched=true && break
-            else
-              [[ -e "$project_root/$f" ]] && matched=true && break
-            fi
-          fi
-        done
-        [[ "$matched" == true ]] && break
-      done <<< "$trigger_files"
-    fi
-
-    # Check trigger extensions (shallow: root + src/)
-    if [[ "$matched" == false && -n "$trigger_exts" && "$trigger_exts" != "null" ]]; then
-      while IFS=',' read -ra exts; do
-        for ext in "${exts[@]}"; do
-          ext="$(echo "$ext" | tr -d '[:space:]')"
-          [[ -z "$ext" ]] && continue
-          local ext_glob="${ext#.}"
-          # shellcheck disable=SC2086
-          if ls "$project_root"/*."$ext_glob" &>/dev/null || \
-             ls "$project_root"/src/*."$ext_glob" &>/dev/null; then
-            matched=true
-            break
-          fi
-        done
-        [[ "$matched" == true ]] && break
-      done <<< "$trigger_exts"
-    fi
-
-    if [[ "$matched" == true ]]; then
-      # Only copy if not already present in project (avoid overwriting local changes)
-      if _spec_exists_in_project "$id" "$project_root"; then
-        continue
-      fi
-      activated_new+=("$id")
-    fi
-  done < <(jq -r '.specs[] | select(.core == false and .triggers != {} and .triggers != null) | [.id, (.triggers.files // [] | join(",")), (.triggers.extensions // [] | join(","))] | @tsv' "$LIBRARY_JSON")
-
-  if [[ ${#activated_new[@]} -eq 0 ]]; then
-    if [[ "$quiet" == false ]]; then
-      echo -e "${DIM}No changes (specs already active or no triggers matched)${NC}"
-    fi
-    return 0
-  fi
-
-  if [[ "$dry_run" == true ]]; then
-    echo -e "${BOLD}Would activate ${#activated_new[@]} specs:${NC}"
-    for id in "${activated_new[@]}"; do
-      local type
-      type="$(_spec_type "$id")"
-      printf "  "
-      _format_type "$type"
-      printf "  %s\n" "$id"
-    done
-    return 0
-  fi
-
-  # Activate new specs — copy to project
-  for id in "${activated_new[@]}"; do
-    _add_to_manifest "$manifest" "$id"
-    _copy_spec_to_project "$id" "$project_root"
-  done
-
-  if [[ "$quiet" == false ]]; then
-    echo -e "${GREEN}Activated ${#activated_new[@]} new specs:${NC} ${activated_new[*]}"
-  fi
-}
-
 cmd_sync() {
   _check_deps
   _check_library
@@ -747,9 +620,6 @@ cmd_init() {
   if [[ "$dry_run" == true ]]; then
     echo -e "${DIM}Would create .claude/ and .github/ directories${NC}"
     echo -e "${DIM}Would create AGENTS.md and CLAUDE.md if missing${NC}"
-    echo ""
-    echo -e "${BOLD}Running trigger detection (dry-run):${NC}"
-    cmd_auto --dry-run
     return 0
   fi
 
@@ -775,10 +645,7 @@ cmd_init() {
     echo -e "${DIM}  CLAUDE.md already exists${NC}"
   fi
 
-  # Run trigger detection
-  echo ""
-  echo -e "${BOLD}Running trigger detection:${NC}"
-  cmd_auto
+  echo -e "\n${DIM}Use 'specs-sync activate <id>' to add specs to this project.${NC}"
 }
 
 cmd_update() {
@@ -990,7 +857,6 @@ main() {
     search)     shift; cmd_search "$@" ;;
     activate)   shift; cmd_activate "$@" ;;
     deactivate) shift; cmd_deactivate "$@" ;;
-    auto)       shift; cmd_auto "$@" ;;
     sync)       shift; cmd_sync "$@" ;;
     init)       shift; cmd_init "$@" ;;
     update)     shift; cmd_update "$@" ;;
