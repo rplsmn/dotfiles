@@ -816,17 +816,6 @@ cmd_update() {
 cmd_generate_library() {
   _check_deps
 
-  # Core specs — hardcoded canonical list
-  local -a CORE_IDS=(
-    "systematic-debugging"
-    "test-driven-development"
-    "using-superpowers"
-    "verification-before-completion"
-    "writing-plans"
-    "writing-skills"
-    "code-reviewer"
-  )
-
   # Locate repo root (from script location or git)
   local repo_dir
   repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -840,36 +829,26 @@ cmd_generate_library() {
 
   local library_file="$repo_dir/library.json"
 
-  # Load existing library.json for preserving tags/triggers
-  local -A existing_tags existing_triggers
+  # Load existing library.json — preserve ALL metadata for known specs
+  local -A existing_specs
   if [[ -f "$library_file" ]]; then
-    while IFS=$'\t' read -r eid etags etriggers; do
-      existing_tags["$eid"]="$etags"
-      existing_triggers["$eid"]="$etriggers"
-    done < <(jq -r '.specs[] | [.id, (.tags | tojson), (.triggers | tojson)] | @tsv' "$library_file")
+    while IFS= read -r spec_json; do
+      local eid
+      eid="$(echo "$spec_json" | jq -r '.id')"
+      existing_specs["$eid"]="$spec_json"
+    done < <(jq -c '.specs[]' "$library_file")
   fi
 
   # Collect existing IDs for add/remove tracking
   local -A old_ids
-  if [[ -f "$library_file" ]]; then
-    while IFS= read -r oid; do
-      old_ids["$oid"]=1
-    done < <(jq -r '.specs[].id' "$library_file")
-  fi
+  for oid in "${!existing_specs[@]}"; do
+    old_ids["$oid"]=1
+  done
 
   # Helper: extract frontmatter field from a markdown file
   _extract_fm_field() {
     local file="$1" field="$2"
     sed -n '/^---$/,/^---$/p' "$file" | grep -m1 "^${field}:" | sed "s/^${field}:[[:space:]]*//" || true
-  }
-
-  # Helper: check if id is core
-  _is_core() {
-    local id="$1"
-    for cid in "${CORE_IDS[@]}"; do
-      [[ "$cid" == "$id" ]] && return 0
-    done
-    return 1
   }
 
   local specs_json="[]"
@@ -886,28 +865,24 @@ cmd_generate_library() {
       [[ -f "$md_file" ]] || continue
 
       new_ids["$id"]=1
-      local name desc
-      name="$(_extract_fm_field "$md_file" "name")"
-      desc="$(_extract_fm_field "$md_file" "description")"
-      [[ -z "$name" ]] && name="$id"
-      [[ -z "$desc" ]] && desc=""
 
-      local core=false
-      _is_core "$id" && core=true
-
-      local tags="[]" triggers="{}"
-      if [[ -n "${existing_tags[$id]+x}" ]]; then
-        tags="${existing_tags[$id]}"
-        triggers="${existing_triggers[$id]}"
+      if [[ -n "${existing_specs[$id]+x}" ]]; then
+        # Existing spec: preserve all metadata from library.json
+        specs_json=$(echo "$specs_json" | jq --argjson spec "${existing_specs[$id]}" '. + [$spec]')
         preserved+=("$id")
       else
+        # New spec: extract from frontmatter, default core:false
+        local name desc
+        name="$(_extract_fm_field "$md_file" "name")"
+        desc="$(_extract_fm_field "$md_file" "description")"
+        [[ -z "$name" ]] && name="$id"
+        [[ -z "$desc" ]] && desc=""
+
+        specs_json=$(echo "$specs_json" | jq \
+          --arg id "$id" --arg type "skill" --arg name "$name" --arg desc "$desc" \
+          '. + [{"id":$id,"type":$type,"name":$name,"description":$desc,"core":false,"tags":[],"triggers":{}}]')
         added+=("$id")
       fi
-
-      specs_json=$(echo "$specs_json" | jq \
-        --arg id "$id" --arg type "skill" --arg name "$name" --arg desc "$desc" \
-        --argjson core "$core" --argjson tags "$tags" --argjson triggers "$triggers" \
-        '. + [{"id":$id,"type":$type,"name":$name,"description":$desc,"core":$core,"tags":$tags,"triggers":$triggers}]')
     done
   fi
 
@@ -926,28 +901,21 @@ cmd_generate_library() {
         id="$(basename "$md_file" .md)"
         new_ids["$id"]=1
 
-        local name desc
-        name="$(_extract_fm_field "$md_file" "name")"
-        desc="$(_extract_fm_field "$md_file" "description")"
-        [[ -z "$name" ]] && name="$id"
-        [[ -z "$desc" ]] && desc=""
-
-        local core=false
-        _is_core "$id" && core=true
-
-        local tags="[]" triggers="{}"
-        if [[ -n "${existing_tags[$id]+x}" ]]; then
-          tags="${existing_tags[$id]}"
-          triggers="${existing_triggers[$id]}"
+        if [[ -n "${existing_specs[$id]+x}" ]]; then
+          specs_json=$(echo "$specs_json" | jq --argjson spec "${existing_specs[$id]}" '. + [$spec]')
           preserved+=("$id")
         else
+          local name desc
+          name="$(_extract_fm_field "$md_file" "name")"
+          desc="$(_extract_fm_field "$md_file" "description")"
+          [[ -z "$name" ]] && name="$id"
+          [[ -z "$desc" ]] && desc=""
+
+          specs_json=$(echo "$specs_json" | jq \
+            --arg id "$id" --arg type "$spec_type" --arg name "$name" --arg desc "$desc" \
+            '. + [{"id":$id,"type":$type,"name":$name,"description":$desc,"core":false,"tags":[],"triggers":{}}]')
           added+=("$id")
         fi
-
-        specs_json=$(echo "$specs_json" | jq \
-          --arg id "$id" --arg type "$spec_type" --arg name "$name" --arg desc "$desc" \
-          --argjson core "$core" --argjson tags "$tags" --argjson triggers "$triggers" \
-          '. + [{"id":$id,"type":$type,"name":$name,"description":$desc,"core":$core,"tags":$tags,"triggers":$triggers}]')
       done
     fi
   done
