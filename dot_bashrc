@@ -68,6 +68,8 @@ claude() {
   if _in_git_repo; then
     local artifact_dir
     artifact_dir="$(_artifact_ensure_dir)" && extra_args+=(--add-dir "$artifact_dir")
+    # Auto-activate specs for this project
+    specs-sync auto --quiet 2>/dev/null || true
   fi
 
   command claude "${extra_args[@]}" "$@"
@@ -84,9 +86,27 @@ copilot() {
   if _in_git_repo; then
     local artifact_dir
     artifact_dir="$(_artifact_ensure_dir)" && extra_args+=(--add-dir "$artifact_dir")
+    # Auto-activate specs for this project
+    specs-sync auto --quiet 2>/dev/null || true
   fi
 
   command copilot "${extra_args[@]}" "$@"
+  local exit_code=$?
+
+  if _in_git_repo; then
+    _artifact_commit_and_push
+  fi
+  return $exit_code
+}
+
+opencode() {
+  local extra_args=()
+  if _in_git_repo; then
+    local artifact_dir
+    artifact_dir="$(_artifact_ensure_dir)" && extra_args+=(--add-dir "$artifact_dir")
+  fi
+
+  command opencode "${extra_args[@]}" "$@"
   local exit_code=$?
 
   if _in_git_repo; then

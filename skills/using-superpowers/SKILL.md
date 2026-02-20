@@ -85,3 +85,15 @@ The skill itself tells you which.
 ## User Instructions
 
 Instructions say WHAT, not HOW. "Add X" or "Fix Y" doesn't mean skip workflows.
+
+## Cold Specs Library
+
+Not all skills are loaded in every session. Additional specialized skills
+are available in the cold library. When you detect the user is working in
+a domain without matching skills loaded (e.g., R development, email
+drafting, ADR writing), suggest they run:
+
+- `specs-sync search <topic>` — find relevant skills by keyword
+- `specs-sync list --tag <tag>` — list skills by tag (e.g., `r`, `github`, `git`)
+- `specs-sync activate <id>` — activate a specific skill for this project
+- `specs-sync status` — see what's currently active and what's available
