@@ -43,7 +43,7 @@ Requires: Ubuntu LTS, git, curl, and [GitHub CLI](https://cli.github.com/) (`gh`
 After pulling config changes, re-sync without reinstalling tools:
 
 ```bash
-machine-sync-remote
+machine-sync
 ```
 
 Syncing artifacts:
@@ -60,7 +60,7 @@ Not all specs (skills, commands, agents) need to load in every LLM session. The 
 
 ### Flow A: Machine sync (automatic)
 
-Runs via `sync.sh` / `machine-sync-remote`. Symlinks **core** specs from the cold library (`~/.local/share/llm-specs/`) into global tool directories (`~/.claude/`, `~/.copilot/`). Vibe gets direct copies in `sync.sh` (skills → `~/.vibe/skills/`, commands → `~/.vibe/prompts/`).
+Runs via `sync.sh` / `machine-sync`. Symlinks **core** specs from the cold library (`~/.local/share/llm-specs/`) into global tool directories (`~/.claude/`, `~/.copilot/`). Vibe gets direct copies in `sync.sh` (skills → `~/.vibe/skills/`, commands → `~/.vibe/prompts/`).
 
 ### Flow B: Repo init/update (manual)
 
