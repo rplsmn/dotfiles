@@ -19,7 +19,7 @@
       "type": "skill",
       "name": "customizing-vectors-r",
       "description": "|",
-      "core": true,
+      "core": false,
       "tags": [
         "r",
         "vctrs",
@@ -44,7 +44,7 @@
       "type": "skill",
       "name": "designing-oop-r",
       "description": "|",
-      "core": true,
+      "core": false,
       "tags": [
         "r",
         "oop",
@@ -71,7 +71,7 @@
       "type": "skill",
       "name": "developing-packages-r",
       "description": "|",
-      "core": true,
+      "core": false,
       "tags": [
         "r",
         "packages",
@@ -109,7 +109,7 @@
       "type": "skill",
       "name": "email-drafter",
       "description": "|",
-      "core": true,
+      "core": false,
       "tags": [
         "email",
         "writing",
@@ -149,7 +149,7 @@
       "type": "skill",
       "name": "metaprogramming-rlang",
       "description": "|",
-      "core": true,
+      "core": false,
       "tags": [
         "r",
         "rlang",
@@ -174,7 +174,7 @@
       "type": "skill",
       "name": "optimizing-r",
       "description": "|",
-      "core": true,
+      "core": false,
       "tags": [
         "r",
         "performance",
@@ -225,7 +225,7 @@
       "type": "skill",
       "name": "shiny-modules-share-data-r6",
       "description": "|",
-      "core": true,
+      "core": false,
       "tags": [
         "r",
         "shiny",
@@ -285,7 +285,7 @@
       "type": "skill",
       "name": "teradata-tpt-cli",
       "description": "Use when exporting working on a Teradata Database and importing / exporting data froma nd to the disk with the TPT utility.",
-      "core": true,
+      "core": false,
       "tags": [
         "teradata",
         "tpt",
@@ -377,7 +377,7 @@
       "type": "skill",
       "name": "writing-tidyverse-r",
       "description": "|",
-      "core": true,
+      "core": false,
       "tags": [
         "r",
         "tidyverse",
@@ -441,7 +441,7 @@
       "type": "command",
       "name": "generate-rpkg-consumer-skill",
       "description": "Generate a condensed consumer skill for a package/library/tool with an API",
-      "core": true,
+      "core": false,
       "tags": [],
       "triggers": {}
     },
