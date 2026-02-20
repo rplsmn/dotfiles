@@ -54,46 +54,59 @@ artifact-sync
 
 # Cold Specs Library
 
-Not all specs (skills, commands, agents) need to load in every LLM session. The **cold specs library** keeps all specs in cold storage and activates only what's relevant via symlinks.
+Not all specs (skills, commands, agents) need to load in every LLM session. The **cold specs library** keeps all specs in cold storage and activates only what's relevant.
 
-## How it works
+## Two flows
 
-1. `sync.sh` copies all specs to `~/.local/share/llm-specs/` (the cold library)
-2. Core specs (debugging, TDD, verification, planning, etc.) are always active
-3. Other specs activate on demand — manually or auto-detected from project type
-4. Active specs are symlinked into tool directories (`~/.claude/`, `~/.copilot/`, `~/.vibe/`)
-5. Shell wrappers auto-detect project type on each `claude`/`copilot` launch
+### Flow A: Machine sync (automatic)
 
-## `specs` CLI
+Runs via `sync.sh` / `machine-sync-remote`. Symlinks **core** specs from the cold library (`~/.local/share/llm-specs/`) into global tool directories (`~/.claude/`, `~/.copilot/`). Vibe gets direct copies in `sync.sh` (skills → `~/.vibe/skills/`, commands → `~/.vibe/prompts/`).
+
+### Flow B: Repo init/update (manual)
+
+Copies **non-core** specs into project-local directories (`.claude/` and `.github/`) so they're committed with the repo and visible to all tools.
+
+## `specs-sync` CLI
 
 ```bash
-specs                           # show current activation status (default)
-specs list                      # list all available specs
-specs list --tag r              # filter by tag
-specs list --type command       # filter by type (skill, command, agent)
-specs search "code review"      # search by keyword across names, descriptions, tags
-specs activate <id> [id...]     # activate specs for current project
-specs deactivate <id> [id...]   # deactivate specs
-specs auto                      # auto-detect project type and activate matching specs
-specs auto --dry-run            # preview what would be activated
-specs sync                      # rebuild symlinks from manifest (repair tool)
-specs reset                     # return to core-only (remove all non-core activations)
+# Machine sync (global dirs — core specs)
+specs-sync sync                      # rebuild core symlinks in global dirs
+
+# Repo init/update (project-local dirs)
+specs-sync init                      # initialize project with matching specs
+specs-sync update                    # refresh project specs from cold library
+specs-sync activate <id> [id...]     # copy a spec into the project
+specs-sync activate --global <id>    # symlink to global dirs instead
+specs-sync deactivate <id> [id...]   # remove specs from project
+specs-sync auto                      # auto-detect and copy missing specs
+specs-sync reset                     # remove non-core specs from project
+
+# Discovery
+specs-sync status                    # show current activation state (default)
+specs-sync list                      # list all available specs
+specs-sync list --tag r              # filter by tag
+specs-sync list --type command       # filter by type (skill, command, agent)
+specs-sync search "code review"      # search by keyword
 ```
 
 ### Auto-detection
 
-When you run `claude` or `copilot` in a git repo, `specs auto --quiet` runs automatically. It checks for project marker files:
+When you run `claude` or `copilot` in a git repo, `specs-sync auto --quiet` runs automatically. It checks for project marker files and copies matching specs into the project if they aren't already present:
 
 | Marker files | Specs activated |
 |---|---|
-| `DESCRIPTION`, `NAMESPACE`, `*.Rproj`, `.R`/`.Rmd`/`.qmd` files | All 6 R skills |
-| `.github/` directory | `solve-issue`, `triage-issues` |
+| `DESCRIPTION`, `NAMESPACE`, `*.Rproj`, `.R`/`.Rmd`/`.qmd` files | R skills |
+| `.github/` directory | `solve-issue`, `solve-batch`, `triage-issues` |
 
-Auto-detection is **additive-only** — it never removes existing symlinks. Use `specs reset` to return to core-only.
+Auto-detection is **additive-only** — it never removes specs or overwrites existing copies. Use `specs-sync reset` to return to core-only.
 
 ### Per-project manifests
 
-Activation state is stored per-project in `~/.artifacts/<project>/.specs-manifest.json`. When not in a git repo, the global manifest at `~/.local/share/llm-specs/global-manifest.json` is used.
+Activation state is stored in the project root as `.specs-manifest.json`. When not in a git repo, the global manifest at `~/.local/share/llm-specs/global-manifest.json` is used.
+
+## OpenCode
+
+OpenCode is installed by `install.sh` but is **not** managed by `specs-sync`. It has its own configuration.
 
 ## Adding new specs
 

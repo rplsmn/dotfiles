@@ -23,12 +23,23 @@
       }
     },
     {
-      "id": "deliver-posit-news",
+      "id": "shiny-modules-share-data-r6",
       "type": "skill",
-      "name": "Deliver Posit News",
-      "description": "Fetch and display news from Posit, including blog posts, podcast episodes, and events.",
+      "name": "Shiny Modules Share Data R6",
+      "description": "Use when multiple modules need to read and write shared state using R6 classes.",
       "core": false,
-      "tags": ["posit", "news", "r"],
+      "tags": ["r", "shiny", "modules", "r6", "reactive"],
+      "triggers": {
+        "files": ["DESCRIPTION", "NAMESPACE", "*.Rproj"]
+      }
+    },
+    {
+      "id": "teradata-tpt-cli",
+      "type": "skill",
+      "name": "Teradata TPT CLI",
+      "description": "Use when working on a Teradata Database and importing/exporting data with the TPT utility.",
+      "core": false,
+      "tags": ["teradata", "tpt", "database", "etl"],
       "triggers": {}
     },
     {
@@ -289,6 +300,26 @@
       "description": "Triage and solve GitHub issues end-to-end with subagents.",
       "core": false,
       "tags": ["github", "issues", "triage"],
+      "triggers": {
+        "files": [".github/"]
+      }
+    },
+    {
+      "id": "generate-consumer-skill",
+      "type": "command",
+      "name": "Generate Consumer Skill",
+      "description": "Generate a condensed consumer skill package for an R package, suitable for LLM agents.",
+      "core": false,
+      "tags": ["skills", "generation", "packages"],
+      "triggers": {}
+    },
+    {
+      "id": "solve-batch",
+      "type": "command",
+      "name": "Solve Batch",
+      "description": "Solve multiple independent GitHub issues in parallel using git worktrees.",
+      "core": false,
+      "tags": ["github", "issues", "parallel", "worktrees"],
       "triggers": {
         "files": [".github/"]
       }

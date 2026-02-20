@@ -93,7 +93,7 @@ are available in the cold library. When you detect the user is working in
 a domain without matching skills loaded (e.g., R development, email
 drafting, ADR writing), suggest they run:
 
-- `specs search <topic>` — find relevant skills by keyword
-- `specs list --tag <tag>` — list skills by tag (e.g., `r`, `github`, `git`)
-- `specs activate <id>` — activate a specific skill for this project
-- `specs status` — see what's currently active and what's available
+- `specs-sync search <topic>` — find relevant skills by keyword
+- `specs-sync list --tag <tag>` — list skills by tag (e.g., `r`, `github`, `git`)
+- `specs-sync activate <id>` — activate a specific skill for this project
+- `specs-sync status` — see what's currently active and what's available

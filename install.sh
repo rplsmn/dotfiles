@@ -29,6 +29,11 @@ if ! command -v vibe &>/dev/null; then
   curl -LsSf https://mistral.ai/vibe/install.sh | bash
 fi
 
+if ! command -v opencode &>/dev/null; then
+  echo "==> Installing OpenCode"
+  curl -fsSL https://opencode.ai/install | bash
+fi
+
 # --- SSH key ---
 if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
   echo "==> Generating SSH key"
@@ -52,8 +57,8 @@ export PATH="$HOME/.local/bin:$PATH"
 cp "$REPO/bin/artifact-sync" "$HOME/.local/bin/"
 sed "s|^REPO=.*|REPO=\"$REPO\"|" "$REPO/bin/machine-sync-remote" > "$HOME/.local/bin/machine-sync-remote"
 chmod +x "$HOME/.local/bin/machine-sync-remote"
-cp "$REPO/bin/specs" "$HOME/.local/bin/specs"
-chmod +x "$HOME/.local/bin/specs"
+cp "$REPO/bin/specs-sync" "$HOME/.local/bin/specs-sync"
+chmod +x "$HOME/.local/bin/specs-sync"
 
 # --- Artifacts repo ---
 echo "==> Syncing artifacts"
