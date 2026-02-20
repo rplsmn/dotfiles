@@ -574,7 +574,9 @@ cmd_auto() {
   local project_root
   project_root="$(_project_root)"
   if [[ -z "$project_root" ]]; then
-    [[ "$quiet" == false ]] && echo -e "${DIM}Not in a git repo — skipping auto-detection.${NC}"
+    if [[ "$quiet" == false ]]; then
+      echo -e "${DIM}Not in a git repo — skipping auto-detection.${NC}"
+    fi
     return 0
   fi
 
@@ -650,7 +652,9 @@ cmd_auto() {
   done < <(jq -r '.specs[] | select(.core == false and .triggers != {} and .triggers != null) | [.id, (.triggers.files // [] | join(",")), (.triggers.extensions // [] | join(","))] | @tsv' "$LIBRARY_JSON")
 
   if [[ ${#activated_new[@]} -eq 0 ]]; then
-    [[ "$quiet" == false ]] && echo -e "${DIM}No changes (specs already active or no triggers matched)${NC}"
+    if [[ "$quiet" == false ]]; then
+      echo -e "${DIM}No changes (specs already active or no triggers matched)${NC}"
+    fi
     return 0
   fi
 
@@ -714,7 +718,9 @@ cmd_sync() {
     _create_symlink "$id" && ((count++)) || true
   done < <(_get_core_ids)
 
-  [[ "$quiet" == false ]] && echo -e "${GREEN}✓ $count core symlinks created across ${#GLOBAL_TOOL_DIRS[@]} global tool directories${NC}"
+  if [[ "$quiet" == false ]]; then
+    echo -e "${GREEN}✓ $count core symlinks created across ${#GLOBAL_TOOL_DIRS[@]} global tool directories${NC}"
+  fi
 }
 
 cmd_init() {
