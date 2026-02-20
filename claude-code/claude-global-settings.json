@@ -7,5 +7,6 @@
     "type": "command",
     "command": "~/.claude/statusline.sh",
     "padding": 0
-  }
+  },
+  "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": 1
 }
