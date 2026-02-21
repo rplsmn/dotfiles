@@ -41,7 +41,6 @@ mkdir -p "$LIBRARY_DIR"
 # Clean and repopulate cold library (removes stale entries)
 rm -rf "$LIBRARY_DIR/skills" "$LIBRARY_DIR/commands" "$LIBRARY_DIR/agents"
 cp -r "$REPO_DIR/skills" "$LIBRARY_DIR/"
-cp -r "$REPO_DIR/commands" "$LIBRARY_DIR/"
 cp -r "$REPO_DIR/agents" "$LIBRARY_DIR/"
 cp "$REPO_DIR/library.json" "$LIBRARY_DIR/"
 
@@ -58,7 +57,6 @@ echo "==> Activating core specs (global symlinks)"
 echo "==> Syncing Vibe specs"
 mkdir -p "$HOME/.vibe/skills" "$HOME/.vibe/prompts" "$HOME/.vibe/agents"
 cp -r "$REPO_DIR/skills"/* "$HOME/.vibe/skills/" 2>/dev/null || true
-cp "$REPO_DIR/commands"/*.md "$HOME/.vibe/prompts/" 2>/dev/null || true
 cp "$REPO_DIR/agents"/*.md "$HOME/.vibe/agents/" 2>/dev/null || true
 
 # --- Global instructions ---
@@ -78,7 +76,7 @@ else
 fi
 
 # --- Bin scripts ---
-echo "==> Syncing commands to ~/.local/bin"
+echo "==> Syncing bin scripts to ~/.local/bin"
 mkdir -p "$HOME/.local/bin"
 cp "$REPO_DIR/bin/artifact-sync" "$HOME/.local/bin/"
 sed "s|^REPO=.*|REPO=\"$REPO_DIR\"|" "$REPO_DIR/bin/machine-sync" > "$HOME/.local/bin/machine-sync"

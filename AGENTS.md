@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A personal developer environment bootstrap for Ubuntu/WSL that provisions:
 - CLI AI assistants (Claude Code, GitHub Copilot CLI, Mistral Vibe, OpenCode)
 - Shell configuration (`.bashrc`, `.gitconfig`)
-- A **Cold Specs Library** that manages reusable LLM skills, commands, and agents across tools and projects
+- A **Cold Specs Library** that manages reusable LLM skills and agents across tools and projects
 
 ## Key Commands
 
@@ -34,8 +34,7 @@ The central concept. Not all specs load in every LLM session — only relevant o
 
 | Type | Location | Format |
 |------|----------|--------|
-| Skills | `skills/<name>/SKILL.md` | Directory with `SKILL.md` entry point + optional references |
-| Commands | `commands/<name>.md` | Single markdown file |
+| Skills | `skills/<name>/SKILL.md` | Directory with `SKILL.md` entry point + optional companions |
 | Agents | `agents/<name>.md` | Single markdown file |
 
 ### Core vs Non-Core
@@ -92,6 +91,5 @@ Auto-detection is **additive-only** — never removes or overwrites existing pro
 - `.gitattributes` enforces LF line endings (`* text=auto eol=lf`) for WSL/Windows compatibility
 - `jq` is the sole runtime dependency (installed by `install.sh`)
 - Skill frontmatter: only `name` and `description` fields; `description` must start with "Use when..." describing triggering conditions
-- Command frontmatter: supports `description`, `disable-model-invocation`, `arguments`
-- Adding new specs: create in `skills/`, `commands/`, or `agents/` → add entry to `library.json` → run `sync.sh`
+- Adding new specs: create in `skills/` or `agents/` → add entry to `library.json` → run `sync.sh`
 - Commit style: conventional commits (`fix:`, `feat:`, `refactor:`, `chore:`), WHY over WHAT

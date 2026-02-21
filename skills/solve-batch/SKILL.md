@@ -1,4 +1,5 @@
 ---
+name: solve-batch
 description: "Solve multiple independent GitHub issues in parallel using git worktrees. Dispatches one agent per issue, then blind cross-reviews."
 ---
 

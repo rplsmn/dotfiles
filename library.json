@@ -678,7 +678,7 @@
     },
     {
       "id": "archive-artifacts",
-      "type": "command",
+      "type": "skill",
       "name": "archive-artifacts",
       "description": "Archive old stale LLM files in the global artifacts folder",
       "core": true,
@@ -691,7 +691,7 @@
     },
     {
       "id": "brainstorm",
-      "type": "command",
+      "type": "skill",
       "name": "brainstorm",
       "description": "\"You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores requirements and design before implementation.\"",
       "core": true,
@@ -704,7 +704,7 @@
     },
     {
       "id": "execute-plan",
-      "type": "command",
+      "type": "skill",
       "name": "execute-plan",
       "description": "Execute plan in batches with review checkpoints",
       "core": true,
@@ -717,7 +717,7 @@
     },
     {
       "id": "generate-rpkg-consumer-skill",
-      "type": "command",
+      "type": "skill",
       "name": "generate-rpkg-consumer-skill",
       "description": "Generate a condensed consumer skill for a package/library/tool with an API",
       "core": false,
@@ -726,7 +726,7 @@
     },
     {
       "id": "implementing-team",
-      "type": "command",
+      "type": "skill",
       "name": "implementing-team",
       "description": "\"Dispatch an implementation team: Haiku messengers coordinate Opus 4.6 coders (TDD, lean) and Opus 4.6 reviewers to implement tasks from existing plans.\"",
       "core": true,
@@ -739,7 +739,7 @@
     },
     {
       "id": "planning-team",
-      "type": "command",
+      "type": "skill",
       "name": "planning-team",
       "description": "\"Dispatch a planning team: Haiku messengers coordinate Opus planners and Opus reviewers to produce reviewed implementation plans for one or more tasks.\"",
       "core": true,
@@ -752,7 +752,7 @@
     },
     {
       "id": "solve-batch",
-      "type": "command",
+      "type": "skill",
       "name": "solve-batch",
       "description": "\"Solve multiple independent GitHub issues in parallel using git worktrees. Dispatches one agent per issue, then blind cross-reviews.\"",
       "core": false,
@@ -770,7 +770,7 @@
     },
     {
       "id": "solve-issue",
-      "type": "command",
+      "type": "skill",
       "name": "solve-issue",
       "description": "\"Solve a GitHub issue end-to-end: plan, implement (TDD), review, open PR. Uses subagents for each phase.\"",
       "core": true,
@@ -788,7 +788,7 @@
     },
     {
       "id": "team-review-js",
-      "type": "command",
+      "type": "skill",
       "name": "team-review-js",
       "description": "JavaScript-specific review guidance companion for planning-team and implementing-team commands.",
       "core": true,
@@ -801,7 +801,7 @@
     },
     {
       "id": "team-review-r",
-      "type": "command",
+      "type": "skill",
       "name": "team-review-r",
       "description": "R-specific review guidance companion for planning-team and implementing-team commands.",
       "core": true,
@@ -814,7 +814,7 @@
     },
     {
       "id": "team-review-rust",
-      "type": "command",
+      "type": "skill",
       "name": "team-review-rust",
       "description": "Rust-specific review guidance companion for planning-team and implementing-team commands.",
       "core": true,
@@ -827,7 +827,7 @@
     },
     {
       "id": "triage-issues",
-      "type": "command",
+      "type": "skill",
       "name": "triage-issues",
       "description": "\"Solve a GitHub issue end-to-end: plan, implement (TDD), review, open PR. Uses subagents for each phase.\"",
       "core": true,
@@ -844,7 +844,7 @@
     },
     {
       "id": "write-plan",
-      "type": "command",
+      "type": "skill",
       "name": "write-plan",
       "description": "Create detailed implementation plan with bite-sized tasks",
       "core": true,

@@ -786,13 +786,9 @@ cmd_generate_library() {
     done
   fi
 
-  # Scan commands and agents (each is a .md file)
-  for spec_type in command agent; do
-    local subdir
-    case "$spec_type" in
-      command) subdir="commands" ;;
-      agent)   subdir="agents" ;;
-    esac
+  # Scan agents (each is a .md file)
+  for spec_type in agent; do
+    local subdir="agents"
 
     if [[ -d "$repo_dir/$subdir" ]]; then
       for md_file in "$repo_dir/$subdir"/*.md; do

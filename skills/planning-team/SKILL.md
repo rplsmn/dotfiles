@@ -1,12 +1,6 @@
 ---
+name: planning-team
 description: "Brainstorm with the user, then dispatch Opus planners and reviewers to produce iterated-reviewed implementation plans for one or more tasks."
-arguments:
-  - name: mode
-    description: "Execution mode: 'parallel' dispatches all plan-writing tasks simultaneously (independent tasks), 'sequential' chains tasks so each builds on the previous output (dependent tasks). Default: parallel"
-    required: false
-  - name: lang
-    description: "Override language detection. Examples: 'r', 'js', 'python', 'go', 'rust'. If not provided, detection runs in Phase 0."
-    required: false
 ---
 
 # /planning-team
@@ -73,7 +67,7 @@ Before engaging the user:
    - If `$ARGUMENTS` contains a language flag (e.g., `--lang r`), use that
    - Otherwise, check AGENTS.md / CLAUDE.md for stated tech stack
    - Fallback: scan for file markers (.Rproj, package.json, Cargo.toml, go.mod, pyproject.toml, etc.)
-   - If a `team-review-<lang>.md` companion exists, read it once for injection into agent prompts
+   - If a companion file `team-review-<lang>.md` exists in this skill's directory, read it once for injection into agent prompts
 5. Note the detected language (or user-provided override) for use in Phase 2
 
 ---
