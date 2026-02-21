@@ -28,7 +28,7 @@ The central concept. Not all specs load in every LLM session — only relevant o
 
 **Flow A — Machine sync** (`sync.sh`): Core specs are **symlinked** from cold storage (`~/.local/share/llm-specs/`) into global tool directories (`~/.claude/`, `~/.copilot/`). Vibe gets direct copies.
 
-**Flow B — Repo init/update** (`specs-sync`): Non-core specs are **copied** into project-local directories (`.claude/`, `.github/`) so they're committed with the repo.
+**Flow B — Repo init/refresh** (`specs-sync`): Non-core specs are **copied** into project-local directories (`.claude/`, `.github/`) so they're committed with the repo.
 
 ### Spec Types
 
@@ -56,7 +56,7 @@ Auto-detection is **additive-only** — never removes or overwrites existing pro
 - `auto [--quiet]` — Auto-detect and activate based on project markers
 - `activate <id> [--global]` — Copy to project or symlink globally
 - `deactivate <id>` — Remove from project
-- `init` / `update` / `reset` — Project lifecycle
+- `init` / `refresh` / `reset` — Project lifecycle
 - `list [--tag TAG] [--type TYPE]` / `search <query>` — Discovery
 - `generate-library` — Regenerate `library.json` from disk contents (preserves existing metadata)
 
