@@ -4,7 +4,7 @@
 #
 # Two flows:
 #   Flow A (machine sync): symlinks core specs from cold library to global tool dirs
-#   Flow B (repo init/update): copies matching specs into project-local dirs
+#   Flow B (repo init/refresh): copies matching specs into project-local dirs
 set -euo pipefail
 
 # --- Configuration ---
@@ -272,9 +272,8 @@ Machine sync (global dirs — core specs via symlinks):
   sync            Rebuild core spec symlinks in global dirs
   status          Show current activation state (default)
 
-Repo init/update (project-local dirs — copies):
+Repo init/refresh (project-local dirs — copies):
   init            Initialize project with matching specs
-  update          Refresh project specs from cold library (verbose)
   refresh         Update activated specs from cold library; auto-commit if changed
   activate        Activate specs (project-local copy, or --global symlink)
   deactivate      Remove specs from project-local dirs
@@ -295,7 +294,7 @@ Options:
 
 Examples:
   specs-sync init                    # initialize project with matching specs
-  specs-sync update                  # refresh specs from cold library
+  specs-sync refresh                  # refresh specs from cold library
   specs-sync activate solve-issue    # copy a spec into the project
   specs-sync activate --global tdd   # symlink to global dirs
   specs-sync sync                    # rebuild global core symlinks
@@ -714,44 +713,6 @@ cmd_init() {
   echo -e "\n${DIM}Use 'specs-sync activate <id>' to add specs to this project.${NC}"
 }
 
-cmd_update() {
-  _check_deps
-  _check_library
-
-  local project_root
-  project_root="$(_project_root)"
-  if [[ -z "$project_root" ]]; then
-    echo -e "${RED}Error: Not in a git repository.${NC}" >&2
-    exit 1
-  fi
-
-  local manifest
-  manifest="$(_manifest_path)"
-  _ensure_manifest "$manifest"
-
-  local updated=0
-
-  # Update all activated specs from cold library
-  while IFS= read -r id; do
-    [[ -z "$id" ]] && continue
-    if _spec_exists "$id"; then
-      _copy_spec_to_project "$id" "$project_root"
-      ((updated++))
-      local type
-      type="$(_spec_type "$id")"
-      echo -e "${GREEN}✓ Updated: $id ($type)${NC}"
-    else
-      echo -e "${YELLOW}⚠ Spec in manifest but not in library: $id${NC}" >&2
-    fi
-  done < <(_get_activated "$manifest")
-
-  if [[ "$updated" -eq 0 ]]; then
-    echo -e "${DIM}No activated specs to update. Run 'specs-sync init' or 'specs-sync activate' first.${NC}"
-  else
-    echo -e "${GREEN}✓ Updated $updated specs from cold library${NC}"
-  fi
-}
-
 cmd_generate_library() {
   _check_deps
 
@@ -926,7 +887,6 @@ main() {
     refresh)    shift; cmd_refresh "$@" ;;
     sync)       shift; cmd_sync "$@" ;;
     init)       shift; cmd_init "$@" ;;
-    update)     shift; cmd_update "$@" ;;
     reset)      shift 2>/dev/null || true; cmd_reset "$@" ;;
     generate-library) shift; cmd_generate_library "$@" ;;
     help|--help|-h) cmd_help ;;
