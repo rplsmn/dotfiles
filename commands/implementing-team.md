@@ -25,6 +25,7 @@ Orchestrator (you)
 │
 ├── Phase 0: Context Gathering
 │   ├── Locate plans, read project docs
+│   ├── Detect programming language and load guidance
 │   └── Ensure feature branch exists
 │
 ├── Phase 1: Dispatch Coder-Reviewer Agents
@@ -51,7 +52,7 @@ Orchestrator (you)
 ## Your Role (Orchestrator)
 
 1. **Locate the plans** — each task must have an existing plan. If no plan exists, stop and tell the user to run `/planning-team` first.
-2. **Prepare context** — read project docs for conventions, detect the test command
+2. **Prepare context** — read project docs for conventions, detect the test command and programming language
 3. **Create feature branch** if on main: `git checkout -b feature/<description>`
 4. **Dispatch agents** — one Opus agent per task
 5. **Merge worktree branches** (parallel mode) — merge each agent's branch into the feature branch
@@ -63,9 +64,27 @@ Orchestrator (you)
 ## Phase 0: Context Gathering
 
 1. Read project docs (CLAUDE.md, AGENTS.md) for conventions, test command, and coding style
-2. Identify the implementation plans from the user's prompt or the artifacts directory
-3. Detect the test command (from project docs or common patterns like `Rscript -e "testthat::test_local()"`, `npm test`, `pytest`, etc.)
-4. Ensure you're on a feature branch. If on main, create one: `git checkout -b feature/<description>`
+2. **Detect programming language** and load language-specific review guidance (see Language Detection below)
+3. Identify the implementation plans from the user's prompt or the artifacts directory
+4. Detect the test command (from project docs or common patterns like `npm test`, `pytest`, `cargo test`, `go test`, etc.)
+5. Ensure you're on a feature branch. If on main, create one: `git checkout -b feature/<description>`
+
+### Language Detection
+
+1. **Check for explicit language flag**: If `$ARGUMENTS` contains `--lang <language>` (e.g., `--lang rust`), use that language.
+2. **Check project docs**: Look in AGENTS.md / CLAUDE.md for stated tech stack (What languages/frameworks are mentioned as primary?).
+3. **Fallback: Scan for file markers** in project root:
+   - `.Rproj` → R
+   - `package.json` → JavaScript/Node.js
+   - `Cargo.toml` → Rust
+   - `go.mod` → Go
+   - `requirements.txt` or `setup.py` or `pyproject.toml` → Python
+   - (Use the first one found as the detected language)
+4. **Locate language-specific review guidance**:
+   - If a file `commands/team-review-<language>.md` exists locally (e.g., `team-review-r.md`, `team-review-rust.md`), read it fully.
+   - This file contains critical language-specific review points, type system guidance, common pitfalls, and testing considerations.
+   - Carry this content into agent prompts as `<LANGUAGE_GUIDANCE>` (see Coder-Reviewer and Reviewer prompts below).
+   - If no companion file exists for the detected language, `<LANGUAGE_GUIDANCE>` is empty or omitted (use generic criteria only).
 
 ---
 
@@ -95,6 +114,12 @@ Read the plan FIRST: <PLAN_FILE_PATH>
 ## Test Command
 
 <TEST_COMMAND>
+
+## Language-Specific Guidance
+
+<LANGUAGE_GUIDANCE>
+
+(The orchestrator injects language-specific review criteria here. This section contains critical things to watch for when implementing and testing code in <LANGUAGE>. If no language-specific companion exists, this may be empty.)
 
 ## Working Directory
 
@@ -151,6 +176,12 @@ Read this: <PLAN_FILE_PATH>
 ## Test Command
 <TEST_COMMAND>
 
+## Language-Specific Guidance
+
+<LANGUAGE_GUIDANCE>
+
+(Same language-specific criteria as injected into the coder prompt. Use these to guide your critical assessment.)
+
 ## Review Process
 
 1. **Run tests first**: Execute `<TEST_COMMAND>`. If tests fail, that's your first and most critical finding. Do not continue the review until you've documented which tests fail and why.
@@ -159,18 +190,21 @@ Read this: <PLAN_FILE_PATH>
 
 3. **Review against the plan LINE BY LINE**:
    - Did the coder implement every step?
-   - Do function signatures match the plan?
-   - Are column names, join keys, guard conditions correct?
+   - Do function signatures, type contracts, and method dispatch match the plan?
+   - Are guard conditions, error handling, and API boundary contracts correct?
    - Are there gaps or deviations from the plan?
 
 4. **Code quality**:
    - Clean, minimal, no dead code, no over-engineering?
    - Convention compliance (naming, patterns, style)?
    - Any risks to existing functionality?
+   - Data flow correct? (inputs flow to outputs correctly, state mutations are intentional and safe)
+   - Regression risks? (does code break existing behavior?)
 
 5. **Test quality**:
    - Are tests meaningful? Do they test behavior, not implementation details?
    - Do they cover the edge cases listed in the plan?
+   - Are tests sensitive to breaking changes? (would they catch a regression?)
 
 ## Output
 
@@ -204,10 +238,10 @@ Report back with EXACTLY this format:
 ## Status: done / stuck (with reason)
 
 ## Files Created
-- path/to/new_file.R
+- path/to/new_file
 
 ## Files Modified
-- path/to/existing_file.R
+- path/to/existing_file
 
 ## Tests
 - X tests passing, Y new tests added

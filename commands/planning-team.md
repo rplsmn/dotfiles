@@ -4,6 +4,9 @@ arguments:
   - name: mode
     description: "Execution mode: 'parallel' dispatches all plan-writing tasks simultaneously (independent tasks), 'sequential' chains tasks so each builds on the previous output (dependent tasks). Default: parallel"
     required: false
+  - name: lang
+    description: "Override language detection. Examples: 'r', 'js', 'python', 'go', 'rust'. If not provided, detection runs in Phase 0."
+    required: false
 ---
 
 # /planning-team
@@ -18,13 +21,18 @@ Brainstorm interactively with the user to produce a validated spec, then dispatc
 
 Parse `mode` from `$ARGUMENTS`. If `$ARGUMENTS` contains `sequential`, set mode to sequential. Otherwise default to `parallel`.
 
+- **lang**: Language override (optional)
+  - Examples: `r`, `js`, `python`, `go`, `rust`
+  - If not provided, automatic detection runs in Phase 0
+
 ## Team Structure
 
 ```
 Orchestrator (you)
 │
 ├── Phase 0: Context Gathering
-│   └── Explore subagent → reads source files + project docs
+│   ├── Explore subagent → reads source files + project docs
+│   └── Language Detection → infers project language from flags, docs, or file markers
 │
 ├── Phase 1: Brainstorming (you + user, interactive)
 │   ├── Ask questions one at a time
@@ -46,7 +54,7 @@ Orchestrator (you)
 
 You are the orchestrator. Your job is:
 
-1. **Gather context** — dispatch Explore subagent, read project docs
+1. **Gather context** — dispatch Explore subagent, read project docs, detect language
 2. **Brainstorm with the user** — interactive design session producing a validated spec
 3. **Dispatch planner-reviewer agents** — one Opus agent per task
 4. **Collect results** — wait for all agents, report status
@@ -61,6 +69,12 @@ Before engaging the user:
 1. Read project docs (CLAUDE.md, AGENTS.md, README) for conventions and structure
 2. Dispatch an **Explore subagent** (`subagent_type: Explore`) to read source files relevant to the user's prompt
 3. Identify the artifacts directory: `~/.artifacts/<project>/plans/` or the project's designated plans folder
+4. **Detect language**:
+   - If `$ARGUMENTS` contains a language flag (e.g., `--lang r`), use that
+   - Otherwise, check AGENTS.md / CLAUDE.md for stated tech stack
+   - Fallback: scan for file markers (.Rproj, package.json, Cargo.toml, go.mod, pyproject.toml, etc.)
+   - If a `team-review-<lang>.md` companion exists, read it once for injection into agent prompts
+5. Note the detected language (or user-provided override) for use in Phase 2
 
 ---
 
@@ -110,6 +124,10 @@ You are a planner-reviewer agent. Write a detailed implementation plan, get it r
 
 <TASK_DESCRIPTION from validated spec — include ALL design decisions, naming conventions, scope, rationale>
 
+## Language Guidance
+
+<LANGUAGE_GUIDANCE>
+
 ## Source Files to Read
 
 You MUST read ALL of these files before writing the plan:
@@ -136,9 +154,9 @@ Write a detailed implementation plan to:
 
 The plan MUST include:
 - Complete function signatures with FULL code bodies (not skeletons or pseudocode)
-- Explicit column names, join keys, guard conditions
+- Explicit type contracts, method dispatch, guard conditions at API boundaries
 - Pipeline wiring changes (how new code connects to existing code)
-- Testing strategy with concrete test cases
+- Testing strategy with concrete test cases (reference the test command documented in project CLAUDE.md or AGENTS.md; never assume language-specific commands)
 - Edge cases section
 - Exit criteria / definition of done
 
@@ -157,16 +175,20 @@ Read this file: <PLAN_FILE_PATH>
 ## Validated Spec (what was agreed with the user)
 <SPEC_SUMMARY>
 
+## Language Guidance
+
+<LANGUAGE_GUIDANCE>
+
 ## Source Files to Read (you MUST read these independently — do NOT trust the plan's claims about them)
 <SAME FILE LIST AS PLANNER>
 
 ## Review Criteria
 
 1. Compare proposed function code against actual source code LINE BY LINE
-2. Check every column name, join key, guard condition against actual data structures
+2. Check every type contract, method dispatch, guard condition against actual code structures
 3. Verify data flow: does each step's output match the next step's expected input?
 4. Check for behavioral regressions: does the proposed code produce identical results to current code?
-5. Verify backend handling differences (data.frame vs tbl_sql if applicable)
+5. Verify API boundary contracts are correctly stated
 6. Look for missing edge cases
 7. Check convention compliance (naming, patterns, style)
 
@@ -240,4 +262,5 @@ Plus: total artifact count, any tasks needing human attention, and suggested nex
 - **Final review persisted** — saved to disk alongside the plan for traceability
 - **Artifacts are permanent** — written to `~/.artifacts/<project>/plans/`, never ephemeral
 - **Sequential mode chains context** — each agent gets the previous task's plan path as "Prior work"
+- **Language guidance is injected** — companion files are read once by orchestrator, passed to all agents
 - **Never start implementing** — this command produces plans only

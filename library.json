@@ -472,6 +472,45 @@
       "triggers": {}
     },
     {
+      "id": "team-review-r",
+      "type": "command",
+      "name": "team-review-r",
+      "description": "R-specific review guidance companion for planning-team and implementing-team commands.",
+      "core": true,
+      "tags": [
+        "review",
+        "team",
+        "r"
+      ],
+      "triggers": {}
+    },
+    {
+      "id": "team-review-js",
+      "type": "command",
+      "name": "team-review-js",
+      "description": "JavaScript-specific review guidance companion for planning-team and implementing-team commands.",
+      "core": true,
+      "tags": [
+        "review",
+        "team",
+        "javascript"
+      ],
+      "triggers": {}
+    },
+    {
+      "id": "team-review-rust",
+      "type": "command",
+      "name": "team-review-rust",
+      "description": "Rust-specific review guidance companion for planning-team and implementing-team commands.",
+      "core": true,
+      "tags": [
+        "review",
+        "team",
+        "rust"
+      ],
+      "triggers": {}
+    },
+    {
       "id": "solve-batch",
       "type": "command",
       "name": "solve-batch",
