@@ -15,6 +15,78 @@
       "triggers": {}
     },
     {
+      "id": "algorithmic-art",
+      "type": "skill",
+      "name": "algorithmic-art",
+      "description": "Creating algorithmic art using p5.js with seeded randomness and interactive parameter exploration. Use this when users request creating art using code, generative art, algorithmic art, flow fields, or particle systems. Create original algorithmic art rather than copying existing artists' work to avoid copyright violations.",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
+      "id": "brand-yml",
+      "type": "skill",
+      "name": "brand-yml",
+      "description": ">",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
+      "id": "canvas-design",
+      "type": "skill",
+      "name": "canvas-design",
+      "description": "Create beautiful visual art in .png and .pdf documents using design philosophy. You should use this skill when the user asks to create a poster, piece of art, design, or other static piece. Create original visual designs, never copying existing artists' work to avoid copyright violations.",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
+      "id": "cli",
+      "type": "skill",
+      "name": "cli",
+      "description": ">",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
+      "id": "content-creator",
+      "type": "skill",
+      "name": "content-creator",
+      "description": "|",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
+      "id": "cran-extrachecks",
+      "type": "skill",
+      "name": "cran-extrachecks",
+      "description": ">",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
+      "id": "create-release-checklist",
+      "type": "skill",
+      "name": "create-release-checklist",
+      "description": ">",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
+      "id": "critical-code-reviewer",
+      "type": "skill",
+      "name": "critical-code-reviewer",
+      "description": ">",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
       "id": "customizing-vectors-r",
       "type": "skill",
       "name": "customizing-vectors-r",
@@ -38,6 +110,15 @@
           ".qmd"
         ]
       }
+    },
+    {
+      "id": "describe-design",
+      "type": "skill",
+      "name": "describe-design",
+      "description": ">",
+      "core": false,
+      "tags": [],
+      "triggers": {}
     },
     {
       "id": "designing-oop-r",
@@ -105,6 +186,24 @@
       "triggers": {}
     },
     {
+      "id": "docx",
+      "type": "skill",
+      "name": "docx",
+      "description": "\"Use this skill whenever the user wants to create, read, edit, or manipulate Word documents (.docx files). Triggers include: any mention of \\\"Word doc\\\", \\\"word document\\\", \\\".docx\\\", or requests to produce professional documents with formatting like tables of contents, headings, page numbers, or letterheads. Also use when extracting or reorganizing content from .docx files, inserting or replacing images in documents, performing find-and-replace in Word files, working with tracked changes or comments, or converting content into a polished Word document. If the user asks for a \\\"report\\\", \\\"memo\\\", \\\"letter\\\", \\\"template\\\", or similar deliverable as a Word or .docx file, use this skill. Do NOT use for PDFs, spreadsheets, Google Docs, or general coding tasks unrelated to document generation.\"",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
+      "id": "editor",
+      "type": "skill",
+      "name": "editor",
+      "description": "|",
+      "core": true,
+      "tags": [],
+      "triggers": {}
+    },
+    {
       "id": "email-drafter",
       "type": "skill",
       "name": "email-drafter",
@@ -115,6 +214,15 @@
         "writing",
         "professional"
       ],
+      "triggers": {}
+    },
+    {
+      "id": "excalidraw-diagram-generator",
+      "type": "skill",
+      "name": "excalidraw-diagram-generator",
+      "description": "'Generate Excalidraw diagrams from natural language descriptions. Use when asked to \"create a diagram\", \"make a flowchart\", \"visualize a process\", \"draw a system architecture\", \"create a mind map\", or \"generate an Excalidraw file\". Supports flowcharts, relationship diagrams, mind maps, and system architecture diagrams. Outputs .excalidraw JSON files that can be opened directly in Excalidraw.'",
+      "core": false,
+      "tags": [],
       "triggers": {}
     },
     {
@@ -131,6 +239,15 @@
       "triggers": {}
     },
     {
+      "id": "find-skills",
+      "type": "skill",
+      "name": "find-skills",
+      "description": "Helps users discover and install agent skills when they ask questions like \"how do I do X\", \"find a skill for X\", \"is there a skill that can...\", or express interest in extending capabilities. This skill should be used when the user is looking for functionality that might exist as an installable skill.",
+      "core": true,
+      "tags": [],
+      "triggers": {}
+    },
+    {
       "id": "finishing-a-development-branch",
       "type": "skill",
       "name": "finishing-a-development-branch",
@@ -142,6 +259,42 @@
         "merge",
         "pr"
       ],
+      "triggers": {}
+    },
+    {
+      "id": "frontend-design",
+      "type": "skill",
+      "name": "frontend-design",
+      "description": "Create distinctive, production-grade frontend interfaces with high design quality. Use this skill when the user asks to build web components, pages, artifacts, posters, or applications (examples include websites, landing pages, dashboards, React components, HTML/CSS layouts, or when styling/beautifying any web UI). Generates creative, polished code and UI design that avoids generic AI aesthetics.",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
+      "id": "git-commit",
+      "type": "skill",
+      "name": "git-commit",
+      "description": "'Execute git commit with conventional commit message analysis, intelligent staging, and message generation. Use when user asks to commit changes, create a git commit, or mentions \"/commit\". Supports: (1) Auto-detecting type and scope from changes, (2) Generating conventional commit messages from diff, (3) Interactive commit with optional type/scope/description overrides, (4) Intelligent file staging for logical grouping'",
+      "core": true,
+      "tags": [],
+      "triggers": {}
+    },
+    {
+      "id": "internal-comms",
+      "type": "skill",
+      "name": "internal-comms",
+      "description": "A set of resources to help me write all kinds of internal communications, using the formats that my company likes to use. Claude should use this skill whenever asked to write some sort of internal communications (status reports, leadership updates, 3P updates, company newsletters, FAQs, incident reports, project updates, etc.).",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
+      "id": "lifecycle",
+      "type": "skill",
+      "name": "lifecycle",
+      "description": ">",
+      "core": false,
+      "tags": [],
       "triggers": {}
     },
     {
@@ -170,6 +323,24 @@
       }
     },
     {
+      "id": "microcopy",
+      "type": "skill",
+      "name": "microcopy",
+      "description": "UI copy and microcopy guidelines. Use when writing UI text, buttons, error messages, empty states, onboarding, or any user-facing copy. Triggers on i18n translation, UI text writing, or copy improvement tasks. Supports both Chinese and English.",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
+      "id": "nano-banana-pro",
+      "type": "skill",
+      "name": "nano-banana-pro",
+      "description": "Generate or edit images via Gemini 3 Pro Image (Nano Banana Pro).",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
       "id": "optimizing-r",
       "type": "skill",
       "name": "optimizing-r",
@@ -193,6 +364,42 @@
           ".qmd"
         ]
       }
+    },
+    {
+      "id": "pdf",
+      "type": "skill",
+      "name": "pdf",
+      "description": "Use this skill whenever the user wants to do anything with PDF files. This includes reading or extracting text/tables from PDFs, combining or merging multiple PDFs into one, splitting PDFs apart, rotating pages, adding watermarks, creating new PDFs, filling PDF forms, encrypting/decrypting PDFs, extracting images, and OCR on scanned PDFs to make them searchable. If the user mentions a .pdf file or asks to produce one, use this skill.",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
+      "id": "pptx",
+      "type": "skill",
+      "name": "pptx",
+      "description": "\"Use this skill any time a .pptx file is involved in any way — as input, output, or both. This includes: creating slide decks, pitch decks, or presentations; reading, parsing, or extracting text from any .pptx file (even if the extracted content will be used elsewhere, like in an email or summary); editing, modifying, or updating existing presentations; combining or splitting slide files; working with templates, layouts, speaker notes, or comments. Trigger whenever the user mentions \\\"deck,\\\" \\\"slides,\\\" \\\"presentation,\\\" or references a .pptx filename, regardless of what they plan to do with the content afterward. If a .pptx file needs to be opened, created, or touched, use this skill.\"",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
+      "id": "pr-create",
+      "type": "skill",
+      "name": "pr-create",
+      "description": "Creates a pull request from current changes, monitors GitHub CI, and debugs any failures until CI passes. Use this when the user says \"create pr\", \"make a pr\", \"open pull request\", \"submit pr\", \"pr for these changes\", or wants to get their current work into a reviewable PR. Assumes the project uses git, is hosted on GitHub, and has GitHub Actions CI with automated checks (lint, build, tests, etc.). Does NOT merge - stops when CI passes and provides the PR link.",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
+      "id": "quarto-authoring",
+      "type": "skill",
+      "name": "quarto-authoring",
+      "description": ">",
+      "core": false,
+      "tags": [],
+      "triggers": {}
     },
     {
       "id": "receiving-code-review",
@@ -221,6 +428,24 @@
       "triggers": {}
     },
     {
+      "id": "shiny-bslib",
+      "type": "skill",
+      "name": "shiny-bslib",
+      "description": "Build modern Shiny dashboards and applications using bslib (Bootstrap 5). Use when creating new Shiny apps, modernizing legacy apps (fluidPage, fluidRow/column, tabsetPanel, wellPanel, shinythemes), or working with bslib page layouts, grid systems, cards, value boxes, navigation, sidebars, filling layouts, theming, accordions, tooltips, popovers, toasts, or bslib inputs. Assumes familiarity with basic Shiny.",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
+      "id": "shiny-bslib-theming",
+      "type": "skill",
+      "name": "shiny-bslib-theming",
+      "description": "Advanced theming for Shiny apps using bslib and Bootstrap 5. Use when customizing app appearance with bs_theme(), Bootswatch themes, custom colors, typography, brand.yml integration, Bootstrap Sass variables, custom Sass/CSS rules, dark mode and color modes, dynamic theme switching, real-time theming, theme inspection, or making R plots match the app theme with thematic.",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
       "id": "shiny-modules-share-data-r6",
       "type": "skill",
       "name": "shiny-modules-share-data-r6",
@@ -242,6 +467,15 @@
       }
     },
     {
+      "id": "skill-creator",
+      "type": "skill",
+      "name": "skill-creator",
+      "description": "Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Claude's capabilities with specialized knowledge, workflows, or tool integrations.",
+      "core": true,
+      "tags": [],
+      "triggers": {}
+    },
+    {
       "id": "subagent-driven-development",
       "type": "skill",
       "name": "subagent-driven-development",
@@ -252,6 +486,15 @@
         "subagent",
         "delegation"
       ],
+      "triggers": {}
+    },
+    {
+      "id": "supabase-postgres-best-practices",
+      "type": "skill",
+      "name": "supabase-postgres-best-practices",
+      "description": "Postgres performance optimization and best practices from Supabase. Use this skill when writing, reviewing, or optimizing Postgres queries, schema designs, or database configurations.",
+      "core": false,
+      "tags": [],
       "triggers": {}
     },
     {
@@ -308,6 +551,15 @@
       "triggers": {}
     },
     {
+      "id": "testing-r-packages",
+      "type": "skill",
+      "name": "testing-r-packages",
+      "description": ">",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
       "id": "using-git-worktrees",
       "type": "skill",
       "name": "using-git-worktrees",
@@ -344,6 +596,24 @@
         "done",
         "quality"
       ],
+      "triggers": {}
+    },
+    {
+      "id": "vitest",
+      "type": "skill",
+      "name": "vitest",
+      "description": "Vitest fast unit testing framework powered by Vite with Jest-compatible API. Use when writing tests, mocking, configuring coverage, or working with test filtering and fixtures.",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
+      "id": "webapp-testing",
+      "type": "skill",
+      "name": "webapp-testing",
+      "description": "Toolkit for interacting with and testing local web applications using Playwright. Supports verifying frontend functionality, debugging UI behavior, capturing browser screenshots, and viewing browser logs.",
+      "core": false,
+      "tags": [],
       "triggers": {}
     },
     {
@@ -396,6 +666,15 @@
           ".qmd"
         ]
       }
+    },
+    {
+      "id": "xlsx",
+      "type": "skill",
+      "name": "xlsx",
+      "description": "\"Use this skill any time a spreadsheet file is the primary input or output. This means any task where the user wants to: open, read, edit, or fix an existing .xlsx, .xlsm, .csv, or .tsv file (e.g., adding columns, computing formulas, formatting, charting, cleaning messy data); create a new spreadsheet from scratch or from other data sources; or convert between tabular file formats. Trigger especially when the user references a spreadsheet file by name or path — even casually (like \\\"the xlsx in my downloads\\\") — and wants something done to it or produced from it. Also trigger for cleaning or restructuring messy tabular data files (malformed rows, misplaced headers, junk data) into proper spreadsheets. The deliverable must be a spreadsheet file. Do NOT trigger when the primary deliverable is a Word document, HTML report, standalone Python script, database pipeline, or Google Sheets API integration, even if tabular data is involved.\"",
+      "core": false,
+      "tags": [],
+      "triggers": {}
     },
     {
       "id": "archive-artifacts",
@@ -472,50 +751,11 @@
       "triggers": {}
     },
     {
-      "id": "team-review-r",
-      "type": "command",
-      "name": "team-review-r",
-      "description": "R-specific review guidance companion for planning-team and implementing-team commands.",
-      "core": true,
-      "tags": [
-        "review",
-        "team",
-        "r"
-      ],
-      "triggers": {}
-    },
-    {
-      "id": "team-review-js",
-      "type": "command",
-      "name": "team-review-js",
-      "description": "JavaScript-specific review guidance companion for planning-team and implementing-team commands.",
-      "core": true,
-      "tags": [
-        "review",
-        "team",
-        "javascript"
-      ],
-      "triggers": {}
-    },
-    {
-      "id": "team-review-rust",
-      "type": "command",
-      "name": "team-review-rust",
-      "description": "Rust-specific review guidance companion for planning-team and implementing-team commands.",
-      "core": true,
-      "tags": [
-        "review",
-        "team",
-        "rust"
-      ],
-      "triggers": {}
-    },
-    {
       "id": "solve-batch",
       "type": "command",
       "name": "solve-batch",
       "description": "\"Solve multiple independent GitHub issues in parallel using git worktrees. Dispatches one agent per issue, then blind cross-reviews.\"",
-      "core": true,
+      "core": false,
       "tags": [
         "github",
         "issues",
@@ -545,6 +785,45 @@
           ".github/"
         ]
       }
+    },
+    {
+      "id": "team-review-js",
+      "type": "command",
+      "name": "team-review-js",
+      "description": "JavaScript-specific review guidance companion for planning-team and implementing-team commands.",
+      "core": true,
+      "tags": [
+        "review",
+        "team",
+        "javascript"
+      ],
+      "triggers": {}
+    },
+    {
+      "id": "team-review-r",
+      "type": "command",
+      "name": "team-review-r",
+      "description": "R-specific review guidance companion for planning-team and implementing-team commands.",
+      "core": true,
+      "tags": [
+        "review",
+        "team",
+        "r"
+      ],
+      "triggers": {}
+    },
+    {
+      "id": "team-review-rust",
+      "type": "command",
+      "name": "team-review-rust",
+      "description": "Rust-specific review guidance companion for planning-team and implementing-team commands.",
+      "core": true,
+      "tags": [
+        "review",
+        "team",
+        "rust"
+      ],
+      "triggers": {}
     },
     {
       "id": "triage-issues",
