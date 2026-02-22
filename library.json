@@ -41,9 +41,9 @@
       "type": "skill",
       "name": "brainstorming",
       "description": "\"You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation.\"",
-      "core": false,
+      "core": true,
       "tags": [],
-      "triggers": {}
+      "triggers": {"design", "plan"}
     },
     {
       "id": "brand-yml",
