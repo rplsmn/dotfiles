@@ -1,6 +1,6 @@
 #!/bin/bash
 # specs-sync — Cold Specs Library CLI
-# Manages activation/deactivation of LLM specs (skills, commands, agents).
+# Manages LLM specs (skills, agents) across global tool dirs and projects.
 #
 # Two flows:
 #   Flow A (machine sync): symlinks core specs from cold library to global tool dirs
@@ -10,8 +10,8 @@ set -euo pipefail
 # --- Configuration ---
 LIBRARY_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/llm-specs"
 LIBRARY_JSON="$LIBRARY_DIR/library.json"
-GLOBAL_MANIFEST="$LIBRARY_DIR/global-manifest.json"
-GLOBAL_TOOL_DIRS=("$HOME/.claude" "$HOME/.copilot")
+GLOBAL_TOOL_DIRS=("$HOME/.claude" "$HOME/.copilot" "$HOME/.agents" "$HOME/.vibe")
+SPEC_SUBDIRS=(skills agents)
 
 # --- Colors ---
 RED='\033[0;31m'
@@ -48,30 +48,6 @@ _project_root() {
   git rev-parse --show-toplevel 2>/dev/null || true
 }
 
-_manifest_path() {
-  local project_root
-  project_root="$(_project_root)"
-  if [[ -n "$project_root" ]]; then
-    echo "$project_root/.specs-manifest.json"
-  else
-    echo "$GLOBAL_MANIFEST"
-  fi
-}
-
-_ensure_manifest() {
-  local manifest="$1"
-  if [[ ! -f "$manifest" ]]; then
-    mkdir -p "$(dirname "$manifest")"
-    echo '{"activated":[]}' > "$manifest"
-  fi
-}
-
-_get_activated() {
-  local manifest="$1"
-  _ensure_manifest "$manifest"
-  jq -r '.activated[]' "$manifest" 2>/dev/null
-}
-
 _get_core_ids() {
   jq -r '.specs[] | select(.core == true) | .id' "$LIBRARY_JSON"
 }
@@ -90,17 +66,11 @@ _spec_exists() {
   jq -e --arg id "$id" '.specs[] | select(.id == $id)' "$LIBRARY_JSON" &>/dev/null
 }
 
-_spec_is_core() {
-  local id="$1"
-  jq -e --arg id "$id" '.specs[] | select(.id == $id and .core == true)' "$LIBRARY_JSON" &>/dev/null
-}
-
 _type_subdir() {
   local type="$1"
   case "$type" in
-    skill)   echo "skills" ;;
-    command) echo "commands" ;;
-    agent)   echo "agents" ;;
+    skill) echo "skills" ;;
+    agent) echo "agents" ;;
   esac
 }
 
@@ -154,25 +124,6 @@ _create_symlink() {
   done
 }
 
-_remove_symlink() {
-  local id="$1"
-  local type
-  type="$(_spec_type "$id")"
-  local subdir
-  subdir="$(_type_subdir "$type")"
-
-  for tool_dir in "${GLOBAL_TOOL_DIRS[@]}"; do
-    if [[ "$type" == "skill" ]]; then
-      local link_path="$tool_dir/$subdir/$id"
-    else
-      local link_path="$tool_dir/$subdir/${id}.md"
-    fi
-    if [[ -L "$link_path" ]]; then
-      rm "$link_path"
-    fi
-  done
-}
-
 _copy_spec_to_project() {
   local id="$1"
   local project_root="$2"
@@ -200,63 +151,11 @@ _copy_spec_to_project() {
   done
 }
 
-_spec_exists_in_project() {
-  local id="$1"
-  local project_root="$2"
-  local type
-  type="$(_spec_type "$id")"
-  local subdir
-  subdir="$(_type_subdir "$type")"
-
-  if [[ "$type" == "skill" ]]; then
-    [[ -d "$project_root/.claude/$subdir/$id" ]]
-  else
-    [[ -f "$project_root/.claude/$subdir/${id}.md" ]]
-  fi
-}
-
-_remove_spec_from_project() {
-  local id="$1"
-  local project_root="$2"
-  local type
-  type="$(_spec_type "$id")"
-  local subdir
-  subdir="$(_type_subdir "$type")"
-
-  local project_dirs=("$project_root/.claude" "$project_root/.github")
-  for pdir in "${project_dirs[@]}"; do
-    if [[ "$type" == "skill" ]]; then
-      rm -rf "$pdir/$subdir/$id"
-    else
-      rm -f "$pdir/$subdir/${id}.md"
-    fi
-  done
-}
-
-_add_to_manifest() {
-  local manifest="$1"
-  local id="$2"
-  _ensure_manifest "$manifest"
-  local tmp="${manifest}.tmp"
-  jq --arg id "$id" '.activated = (.activated + [$id] | unique)' "$manifest" > "$tmp"
-  mv "$tmp" "$manifest"
-}
-
-_remove_from_manifest() {
-  local manifest="$1"
-  local id="$2"
-  _ensure_manifest "$manifest"
-  local tmp="${manifest}.tmp"
-  jq --arg id "$id" '.activated = [.activated[] | select(. != $id)]' "$manifest" > "$tmp"
-  mv "$tmp" "$manifest"
-}
-
 _format_type() {
   local type="$1"
   case "$type" in
-    skill)   printf "${CYAN}%-6s${NC}" "skill" ;;
-    command) printf "${YELLOW}%-6s${NC}" "cmd" ;;
-    agent)   printf "${BLUE}%-6s${NC}" "agent" ;;
+    skill) printf "${CYAN}%-6s${NC}" "skill" ;;
+    agent) printf "${BLUE}%-6s${NC}" "agent" ;;
   esac
 }
 
@@ -270,14 +169,13 @@ Usage: specs-sync <subcommand> [options] [arguments]
 
 Machine sync (global dirs — core specs via symlinks):
   sync            Rebuild core spec symlinks in global dirs
-  status          Show current activation state (default)
+  clean           Remove non-symlinks from global dirs (stale copies)
+  status          Show core specs and project-local specs (default)
 
-Repo init/refresh (project-local dirs — copies):
-  init            Initialize project with matching specs
-  refresh         Update activated specs from cold library; auto-commit if changed
-  activate        Activate specs (project-local copy, or --global symlink)
-  deactivate      Remove specs from project-local dirs
-  reset           Remove non-core specs from project; clear manifest
+Project (local dirs — copies):
+  init            Initialize project directory structure
+  add <id>        Copy a spec from cold library into the project
+  refresh         Update project specs from cold library; auto-commit if changed
 
 Discovery:
   list            List all specs in the library
@@ -287,19 +185,20 @@ Discovery:
 
 Options:
   --tag TAG       Filter by tag (list subcommand)
-  --type TYPE     Filter by type: skill, command, agent (list subcommand)
-  --global        Symlink to global dirs instead of project-local (activate)
+  --type TYPE     Filter by type: skill, agent (list subcommand)
   --quiet         Suppress output (sync/refresh subcommands)
-  --dry-run       Show what would happen without doing it (init subcommand)
+  --dry-run       Show what would happen without doing it (init/clean)
+
+Global tool dirs: ~/.claude, ~/.copilot, ~/.agents, ~/.vibe
 
 Examples:
-  specs-sync init                    # initialize project with matching specs
-  specs-sync refresh                  # refresh specs from cold library
-  specs-sync activate solve-issue    # copy a spec into the project
-  specs-sync activate --global tdd   # symlink to global dirs
   specs-sync sync                    # rebuild global core symlinks
-  specs-sync reset                   # return project to core-only
-  specs-sync generate-library          # regenerate library.json from disk
+  specs-sync clean                   # remove stale non-symlink copies
+  specs-sync init                    # initialize project directories
+  specs-sync add tdd                 # copy a spec into the project
+  specs-sync refresh                 # refresh project specs from cold library
+  specs-sync list --type skill       # list all skills
+  specs-sync generate-library        # regenerate library.json from disk
 EOF
 }
 
@@ -311,20 +210,16 @@ cmd_status() {
   project="$(_project_name)"
   local project_root
   project_root="$(_project_root)"
-  local manifest
-  manifest="$(_manifest_path)"
 
   if [[ -n "$project" ]]; then
-    echo -e "${BOLD}Project:${NC} $project ${DIM}(detected from $project_root)${NC}"
-    echo -e "${BOLD}Manifest:${NC} $manifest"
+    echo -e "${BOLD}Project:${NC} $project ${DIM}($project_root)${NC}"
   else
-    echo -e "${BOLD}Project:${NC} ${DIM}(none — using global manifest)${NC}"
-    echo -e "${BOLD}Manifest:${NC} $GLOBAL_MANIFEST"
+    echo -e "${BOLD}Project:${NC} ${DIM}(none)${NC}"
   fi
   echo ""
 
-  # Core specs
-  echo -e "${BOLD}Core specs (always active):${NC}"
+  # Core specs (globally symlinked)
+  echo -e "${BOLD}Core specs (globally symlinked):${NC}"
   while IFS= read -r id; do
     local type
     type="$(_spec_type "$id")"
@@ -334,30 +229,54 @@ cmd_status() {
   done < <(_get_core_ids)
   echo ""
 
-  # Activated specs
-  _ensure_manifest "$manifest"
-  local activated
-  activated="$(_get_activated "$manifest")"
-  if [[ -n "$activated" ]]; then
-    echo -e "${BOLD}Activated specs:${NC}"
-    while IFS= read -r id; do
-      if _spec_exists "$id"; then
-        local type
-        type="$(_spec_type "$id")"
-        printf "  ${GREEN}✓${NC} "
-        _format_type "$type"
-        printf "  %s\n" "$id"
+  # Project-local specs (detected from .claude/skills/ and .claude/agents/)
+  if [[ -n "$project_root" ]]; then
+    local local_lines=()
+
+    for subdir in "${SPEC_SUBDIRS[@]}"; do
+      local dir="$project_root/.claude/$subdir"
+      [[ -d "$dir" ]] || continue
+
+      if [[ "$subdir" == "skills" ]]; then
+        for entry in "$dir"/*/; do
+          [[ -d "$entry" ]] || continue
+          local id
+          id="$(basename "$entry")"
+          if _spec_exists "$id"; then
+            local_lines+=("$(printf "  ${GREEN}✓${NC} "; _format_type "skill"; printf "  %s" "$id")")
+          else
+            local_lines+=("$(printf "  ${YELLOW}?${NC} skill   %s ${DIM}(not in library)${NC}" "$id")")
+          fi
+        done
+      elif [[ "$subdir" == "agents" ]]; then
+        for entry in "$dir"/*.md; do
+          [[ -f "$entry" ]] || continue
+          local id
+          id="$(basename "$entry" .md)"
+          if _spec_exists "$id"; then
+            local_lines+=("$(printf "  ${GREEN}✓${NC} "; _format_type "agent"; printf "  %s" "$id")")
+          else
+            local_lines+=("$(printf "  ${YELLOW}?${NC} agent   %s ${DIM}(not in library)${NC}" "$id")")
+          fi
+        done
       fi
-    done <<< "$activated"
-    echo ""
+    done
+
+    if [[ ${#local_lines[@]} -gt 0 ]]; then
+      echo -e "${BOLD}Project-local specs:${NC}"
+      for line in "${local_lines[@]}"; do
+        echo -e "$line"
+      done
+      echo ""
+    fi
   fi
 
-  # Cold (inactive) specs
-  echo -e "${BOLD}Cold (inactive):${NC}"
-  local active_ids
-  active_ids="$(_get_core_ids; echo "$activated")"
+  # Cold (not core, not in project)
+  echo -e "${BOLD}Cold (available):${NC}"
+  local core_ids
+  core_ids="$(_get_core_ids)"
   while IFS= read -r id; do
-    if ! echo "$active_ids" | grep -qx "$id"; then
+    if ! echo "$core_ids" | grep -qx "$id"; then
       local type
       type="$(_spec_type "$id")"
       printf "  ${DIM}○${NC} "
@@ -431,35 +350,25 @@ cmd_search() {
     done
 }
 
-cmd_activate() {
+cmd_add() {
   _check_deps
   _check_library
 
-  local use_global=false
-  local dry_run=false
   local ids=()
-
   while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --global)  use_global=true; shift ;;
-      --dry-run) dry_run=true; shift ;;
-      *)         ids+=("$1"); shift ;;
-    esac
+    ids+=("$1"); shift
   done
 
   if [[ ${#ids[@]} -eq 0 ]]; then
-    echo -e "${RED}Usage: specs-sync activate <spec-id> [spec-id...]${NC}" >&2
+    echo -e "${RED}Usage: specs-sync add <spec-id> [spec-id...]${NC}" >&2
     exit 1
   fi
 
-  local manifest
   local project_root
   project_root="$(_project_root)"
-
-  if [[ "$use_global" == true ]]; then
-    manifest="$GLOBAL_MANIFEST"
-  else
-    manifest="$(_manifest_path)"
+  if [[ -z "$project_root" ]]; then
+    echo -e "${RED}Error: Not in a git repository.${NC}" >&2
+    exit 1
   fi
 
   for id in "${ids[@]}"; do
@@ -468,89 +377,10 @@ cmd_activate() {
       continue
     fi
 
-    if _spec_is_core "$id"; then
-      echo -e "${YELLOW}⊘ Already core (always active): $id${NC}"
-      continue
-    fi
-
     local type
     type="$(_spec_type "$id")"
-
-    if [[ "$dry_run" == true ]]; then
-      echo -e "${DIM}Would activate: $id ($type)${NC}"
-      continue
-    fi
-
-    _add_to_manifest "$manifest" "$id"
-
-    if [[ "$use_global" == true ]]; then
-      _create_symlink "$id"
-      echo -e "${GREEN}✓ Activated (global symlink): $id ($type)${NC}"
-    else
-      if [[ -z "$project_root" ]]; then
-        echo -e "${RED}✗ Not in a git repo. Use --global or cd into a project.${NC}" >&2
-        continue
-      fi
-      _copy_spec_to_project "$id" "$project_root"
-      echo -e "${GREEN}✓ Activated (project copy): $id ($type)${NC}"
-    fi
-  done
-
-  if [[ "$dry_run" == false ]]; then
-    echo -e "${DIM}Manifest updated: $manifest${NC}"
-  fi
-}
-
-cmd_deactivate() {
-  _check_deps
-  _check_library
-
-  local use_global=false
-  local ids=()
-
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --global) use_global=true; shift ;;
-      *)        ids+=("$1"); shift ;;
-    esac
-  done
-
-  if [[ ${#ids[@]} -eq 0 ]]; then
-    echo -e "${RED}Usage: specs-sync deactivate <spec-id> [spec-id...]${NC}" >&2
-    exit 1
-  fi
-
-  local manifest
-  local project_root
-  project_root="$(_project_root)"
-
-  if [[ "$use_global" == true ]]; then
-    manifest="$GLOBAL_MANIFEST"
-  else
-    manifest="$(_manifest_path)"
-  fi
-
-  for id in "${ids[@]}"; do
-    if ! _spec_exists "$id"; then
-      echo -e "${RED}✗ Not found: $id${NC}" >&2
-      continue
-    fi
-
-    if _spec_is_core "$id"; then
-      echo -e "${YELLOW}⊘ Cannot deactivate core spec: $id${NC}"
-      continue
-    fi
-
-    local type
-    type="$(_spec_type "$id")"
-    _remove_from_manifest "$manifest" "$id"
-
-    if [[ "$use_global" == true ]]; then
-      _remove_symlink "$id"
-    elif [[ -n "$project_root" ]]; then
-      _remove_spec_from_project "$id" "$project_root"
-    fi
-    echo -e "${GREEN}✓ Deactivated: $id ($type)${NC}"
+    _copy_spec_to_project "$id" "$project_root"
+    echo -e "${GREEN}✓ Added: $id ($type)${NC}"
   done
 }
 
@@ -572,27 +402,42 @@ cmd_refresh() {
     return 0
   fi
 
-  local manifest
-  manifest="$(_manifest_path)"
-  _ensure_manifest "$manifest"
+  # Scan project dirs for specs that match library IDs and update them
+  local refreshed=0
+  for subdir in "${SPEC_SUBDIRS[@]}"; do
+    local dir="$project_root/.claude/$subdir"
+    [[ -d "$dir" ]] || continue
 
-  # Only refresh specs already in the manifest (never adds new ones)
-  local has_activated=false
-  while IFS= read -r id; do
-    [[ -z "$id" ]] && continue
-    has_activated=true
-    if _spec_exists "$id"; then
-      _copy_spec_to_project "$id" "$project_root"
+    if [[ "$subdir" == "skills" ]]; then
+      for entry in "$dir"/*/; do
+        [[ -d "$entry" ]] || continue
+        local id
+        id="$(basename "$entry")"
+        if _spec_exists "$id"; then
+          _copy_spec_to_project "$id" "$project_root"
+          ((refreshed++)) || true
+        fi
+      done
+    elif [[ "$subdir" == "agents" ]]; then
+      for entry in "$dir"/*.md; do
+        [[ -f "$entry" ]] || continue
+        local id
+        id="$(basename "$entry" .md)"
+        if _spec_exists "$id"; then
+          _copy_spec_to_project "$id" "$project_root"
+          ((refreshed++)) || true
+        fi
+      done
     fi
-  done < <(_get_activated "$manifest")
+  done
 
-  if [[ "$has_activated" == false ]]; then
+  if [[ "$refreshed" -eq 0 ]]; then
     return 0
   fi
 
   # Collect spec directories that exist in the project
   local spec_paths=()
-  for subdir in skills commands agents; do
+  for subdir in "${SPEC_SUBDIRS[@]}"; do
     [[ -d "$project_root/.claude/$subdir" ]] && spec_paths+=(".claude/$subdir")
     [[ -d "$project_root/.github/$subdir" ]] && spec_paths+=(".github/$subdir")
   done
@@ -601,7 +446,7 @@ cmd_refresh() {
     return 0
   fi
 
-  # Check for actual content changes (staged or unstaged) and new files
+  # Check for actual content changes and new files
   local has_changes=false
   if ! git -C "$project_root" diff --quiet -- "${spec_paths[@]}" 2>/dev/null; then
     has_changes=true
@@ -614,8 +459,10 @@ cmd_refresh() {
     git -C "$project_root" add -- "${spec_paths[@]}"
     git -C "$project_root" commit -m "chore: refresh specs from cold library" --quiet
     if [[ "$quiet" == false ]]; then
-      echo -e "${GREEN}✓ Refreshed project specs from cold library (committed)${NC}"
+      echo -e "${GREEN}✓ Refreshed $refreshed specs from cold library (committed)${NC}"
     fi
+  elif [[ "$quiet" == false ]]; then
+    echo -e "${DIM}All $refreshed specs already up to date${NC}"
   fi
 }
 
@@ -633,7 +480,7 @@ cmd_sync() {
 
   # Clear existing symlinks in global tool dirs (only symlinks, not real files/dirs)
   for tool_dir in "${GLOBAL_TOOL_DIRS[@]}"; do
-    for subdir in skills commands agents; do
+    for subdir in "${SPEC_SUBDIRS[@]}"; do
       local dir="$tool_dir/$subdir"
       [[ -d "$dir" ]] || continue
       find "$dir" -maxdepth 1 -type l -delete 2>/dev/null || true
@@ -642,7 +489,7 @@ cmd_sync() {
 
   # Also clean broken symlinks
   for tool_dir in "${GLOBAL_TOOL_DIRS[@]}"; do
-    for subdir in skills commands agents; do
+    for subdir in "${SPEC_SUBDIRS[@]}"; do
       local dir="$tool_dir/$subdir"
       [[ -d "$dir" ]] || continue
       find -L "$dir" -maxdepth 1 -type l -delete 2>/dev/null || true
@@ -651,7 +498,7 @@ cmd_sync() {
 
   local count=0
 
-  # Activate core specs only (global symlinks)
+  # Symlink core specs into all global dirs
   while IFS= read -r id; do
     _create_symlink "$id" && ((count++)) || true
   done < <(_get_core_ids)
@@ -690,7 +537,7 @@ cmd_init() {
 
   # Create project-local directories
   for pdir in "$project_root/.claude" "$project_root/.github"; do
-    mkdir -p "$pdir"/{skills,commands,agents}
+    mkdir -p "$pdir"/{skills,agents}
   done
   echo -e "${GREEN}✓ Created .claude/ and .github/ directories${NC}"
 
@@ -710,7 +557,52 @@ cmd_init() {
     echo -e "${DIM}  CLAUDE.md already exists${NC}"
   fi
 
-  echo -e "\n${DIM}Use 'specs-sync activate <id>' to add specs to this project.${NC}"
+  echo -e "\n${DIM}Use 'specs-sync add <id>' to add specs to this project.${NC}"
+}
+
+cmd_clean() {
+  _check_deps
+
+  local dry_run=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --dry-run) dry_run=true; shift ;;
+      *)         shift ;;
+    esac
+  done
+
+  local removed=0
+
+  for tool_dir in "${GLOBAL_TOOL_DIRS[@]}"; do
+    for subdir in "${SPEC_SUBDIRS[@]}"; do
+      local dir="$tool_dir/$subdir"
+      [[ -d "$dir" ]] || continue
+
+      # Find non-symlink entries (regular files, directories)
+      for entry in "$dir"/*; do
+        [[ -e "$entry" ]] || continue
+        if [[ ! -L "$entry" ]]; then
+          local name
+          name="$(basename "$entry")"
+          if [[ "$dry_run" == true ]]; then
+            echo -e "${DIM}Would remove: $tool_dir/$subdir/$name${NC}"
+          else
+            rm -rf "$entry"
+            echo -e "${GREEN}✓ Removed: $tool_dir/$subdir/$name${NC}"
+          fi
+          ((removed++)) || true
+        fi
+      done
+    done
+  done
+
+  if [[ "$removed" -eq 0 ]]; then
+    echo -e "${DIM}Nothing to clean — all entries are symlinks${NC}"
+  elif [[ "$dry_run" == true ]]; then
+    echo -e "\n${DIM}$removed items would be removed. Run without --dry-run to proceed.${NC}"
+  else
+    echo -e "\n${GREEN}✓ Cleaned $removed non-symlink entries from global dirs${NC}"
+  fi
 }
 
 cmd_generate_library() {
@@ -767,11 +659,9 @@ cmd_generate_library() {
       new_ids["$id"]=1
 
       if [[ -n "${existing_specs[$id]+x}" ]]; then
-        # Existing spec: preserve all metadata from library.json
         specs_json=$(echo "$specs_json" | jq --argjson spec "${existing_specs[$id]}" '. + [$spec]')
         preserved+=("$id")
       else
-        # New spec: extract from frontmatter, default core:false
         local name desc
         name="$(_extract_fm_field "$md_file" "name")"
         desc="$(_extract_fm_field "$md_file" "description")"
@@ -786,39 +676,31 @@ cmd_generate_library() {
     done
   fi
 
-  # Scan commands and agents (each is a .md file)
-  for spec_type in command agent; do
-    local subdir
-    case "$spec_type" in
-      command) subdir="commands" ;;
-      agent)   subdir="agents" ;;
-    esac
+  # Scan agents (each is a .md file)
+  if [[ -d "$repo_dir/agents" ]]; then
+    for md_file in "$repo_dir/agents"/*.md; do
+      [[ -f "$md_file" ]] || continue
+      local id
+      id="$(basename "$md_file" .md)"
+      new_ids["$id"]=1
 
-    if [[ -d "$repo_dir/$subdir" ]]; then
-      for md_file in "$repo_dir/$subdir"/*.md; do
-        [[ -f "$md_file" ]] || continue
-        local id
-        id="$(basename "$md_file" .md)"
-        new_ids["$id"]=1
+      if [[ -n "${existing_specs[$id]+x}" ]]; then
+        specs_json=$(echo "$specs_json" | jq --argjson spec "${existing_specs[$id]}" '. + [$spec]')
+        preserved+=("$id")
+      else
+        local name desc
+        name="$(_extract_fm_field "$md_file" "name")"
+        desc="$(_extract_fm_field "$md_file" "description")"
+        [[ -z "$name" ]] && name="$id"
+        [[ -z "$desc" ]] && desc=""
 
-        if [[ -n "${existing_specs[$id]+x}" ]]; then
-          specs_json=$(echo "$specs_json" | jq --argjson spec "${existing_specs[$id]}" '. + [$spec]')
-          preserved+=("$id")
-        else
-          local name desc
-          name="$(_extract_fm_field "$md_file" "name")"
-          desc="$(_extract_fm_field "$md_file" "description")"
-          [[ -z "$name" ]] && name="$id"
-          [[ -z "$desc" ]] && desc=""
-
-          specs_json=$(echo "$specs_json" | jq \
-            --arg id "$id" --arg type "$spec_type" --arg name "$name" --arg desc "$desc" \
-            '. + [{"id":$id,"type":$type,"name":$name,"description":$desc,"core":false,"tags":[],"triggers":{}}]')
-          added+=("$id")
-        fi
-      done
-    fi
-  done
+        specs_json=$(echo "$specs_json" | jq \
+          --arg id "$id" --arg type "agent" --arg name "$name" --arg desc "$desc" \
+          '. + [{"id":$id,"type":$type,"name":$name,"description":$desc,"core":false,"tags":[],"triggers":{}}]')
+        added+=("$id")
+      fi
+    done
+  fi
 
   # Detect removed specs
   for oid in "${!old_ids[@]}"; do
@@ -844,35 +726,6 @@ cmd_generate_library() {
   fi
 }
 
-cmd_reset() {
-  _check_deps
-  _check_library
-
-  local project_root
-  project_root="$(_project_root)"
-  local manifest
-  manifest="$(_manifest_path)"
-  _ensure_manifest "$manifest"
-
-  local activated
-  activated="$(_get_activated "$manifest")"
-  local removed=0
-
-  while IFS= read -r id; do
-    [[ -z "$id" ]] && continue
-    if [[ -n "$project_root" ]]; then
-      _remove_spec_from_project "$id" "$project_root"
-    fi
-    _remove_symlink "$id"
-    removed=$((removed + 1))
-  done <<< "$activated"
-
-  # Clear manifest
-  echo '{"activated":[]}' > "$manifest"
-
-  echo -e "${GREEN}Reset to core-only specs. Removed $removed activated specs.${NC}"
-}
-
 # --- Main ---
 
 main() {
@@ -882,12 +735,11 @@ main() {
     status)     shift 2>/dev/null || true; cmd_status "$@" ;;
     list)       shift; cmd_list "$@" ;;
     search)     shift; cmd_search "$@" ;;
-    activate)   shift; cmd_activate "$@" ;;
-    deactivate) shift; cmd_deactivate "$@" ;;
+    add)        shift; cmd_add "$@" ;;
     refresh)    shift; cmd_refresh "$@" ;;
     sync)       shift; cmd_sync "$@" ;;
     init)       shift; cmd_init "$@" ;;
-    reset)      shift 2>/dev/null || true; cmd_reset "$@" ;;
+    clean)      shift; cmd_clean "$@" ;;
     generate-library) shift; cmd_generate_library "$@" ;;
     help|--help|-h) cmd_help ;;
     *)

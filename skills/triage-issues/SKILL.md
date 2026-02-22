@@ -1,4 +1,5 @@
 ---
+name: triage-issues
 description: "Solve a GitHub issue end-to-end: plan, implement (TDD), review, open PR. Uses subagents for each phase."
 ---
 

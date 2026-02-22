@@ -135,20 +135,20 @@ package:
   name: <from DESCRIPTION>
   title: <from DESCRIPTION>
   version: <from DESCRIPTION>
-  
+
 entry_points:
   - function: <name>
     signature: <full signature>
     description: <what it does>
     returns: <return type and structure>
-    
+
 parameters:
   - name: <param>
     type: <R type>
     required: <yes/no>
     valid_values: <list or description>
     default: <default value>
-    
+
 input_data:
   - name: <table/object name>
     description: <purpose>

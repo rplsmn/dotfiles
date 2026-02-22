@@ -95,5 +95,5 @@ drafting, ADR writing), suggest they run:
 
 - `specs-sync search <topic>` — find relevant skills by keyword
 - `specs-sync list --tag <tag>` — list skills by tag (e.g., `r`, `github`, `git`)
-- `specs-sync activate <id>` — activate a specific skill for this project
+- `specs-sync add <id>` — copy a spec from cold library into the project
 - `specs-sync status` — see what's currently active and what's available

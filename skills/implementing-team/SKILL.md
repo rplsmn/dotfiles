@@ -1,9 +1,6 @@
 ---
+name: implementing-team
 description: "Dispatch an implementation team: Opus coder-reviewer agents implement tasks from existing plans with TDD, iterated review, and decision logging."
-arguments:
-  - name: mode
-    description: "Execution mode: 'parallel' dispatches all tasks in isolated worktrees (independent tasks), 'sequential' chains tasks in the same tree (dependent tasks). Default: parallel"
-    required: false
 ---
 
 # /implementing-team
@@ -81,7 +78,7 @@ Orchestrator (you)
    - `requirements.txt` or `setup.py` or `pyproject.toml` → Python
    - (Use the first one found as the detected language)
 4. **Locate language-specific review guidance**:
-   - If a file `commands/team-review-<language>.md` exists locally (e.g., `team-review-r.md`, `team-review-rust.md`), read it fully.
+   - If a companion file `team-review-<language>.md` exists in this skill's directory (e.g., `team-review-r.md`, `team-review-rust.md`), read it fully.
    - This file contains critical language-specific review points, type system guidance, common pitfalls, and testing considerations.
    - Carry this content into agent prompts as `<LANGUAGE_GUIDANCE>` (see Coder-Reviewer and Reviewer prompts below).
    - If no companion file exists for the detected language, `<LANGUAGE_GUIDANCE>` is empty or omitted (use generic criteria only).

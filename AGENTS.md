@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A personal developer environment bootstrap for Ubuntu/WSL that provisions:
 - CLI AI assistants (Claude Code, GitHub Copilot CLI, Mistral Vibe, OpenCode)
 - Shell configuration (`.bashrc`, `.gitconfig`)
-- A **Cold Specs Library** that manages reusable LLM skills, commands, and agents across tools and projects
+- A **Cold Specs Library** that manages reusable LLM skills and agents across tools and projects
 
 ## Key Commands
 
@@ -26,37 +26,30 @@ There is no build system, test suite, linter, or CI/CD. All scripts are pure Bas
 
 The central concept. Not all specs load in every LLM session — only relevant ones are activated.
 
-**Flow A — Machine sync** (`sync.sh`): Core specs are **symlinked** from cold storage (`~/.local/share/llm-specs/`) into global tool directories (`~/.claude/`, `~/.copilot/`). Vibe gets direct copies.
+**Flow A — Machine sync** (`sync.sh`): Core specs are **symlinked** from cold storage (`~/.local/share/llm-specs/`) into global tool directories (`~/.claude/`, `~/.copilot/`, `~/.agents/`, `~/.vibe/`).
 
-**Flow B — Repo init/refresh** (`specs-sync`): Non-core specs are **copied** into project-local directories (`.claude/`, `.github/`) so they're committed with the repo.
+**Flow B — Repo init/refresh** (`specs-sync`): Specs are **copied** into project-local directories (`.claude/`, `.github/`) via `specs-sync add` and updated via `specs-sync refresh`.
 
 ### Spec Types
 
 | Type | Location | Format |
 |------|----------|--------|
-| Skills | `skills/<name>/SKILL.md` | Directory with `SKILL.md` entry point + optional references |
-| Commands | `commands/<name>.md` | Single markdown file |
+| Skills | `skills/<name>/SKILL.md` | Directory with `SKILL.md` entry point + optional companions |
 | Agents | `agents/<name>.md` | Single markdown file |
 
 ### Core vs Non-Core
 
 - **Core** (`"core": true` in `library.json`): Always symlinked globally via `sync.sh`
-- **Non-core**: Activated per-project via triggers or `specs-sync activate`
-
-### Trigger-Based Auto-Detection
-
-Specs declare `triggers` in `library.json` with `files` and `extensions`. Shell wrappers for `claude`/`copilot` in `dot_bashrc` automatically run `specs-sync auto --quiet` before launching, which checks the project root for matching files and copies relevant specs.
-
-Auto-detection is **additive-only** — never removes or overwrites existing project copies.
+- **Non-core**: Added per-project via `specs-sync add`
 
 ### `specs-sync` CLI (`bin/specs-sync`)
 
-~1000 lines of Bash (`set -euo pipefail`). Key subcommands:
-- `sync` — Rebuild core symlinks in global dirs
-- `auto [--quiet]` — Auto-detect and activate based on project markers
-- `activate <id> [--global]` — Copy to project or symlink globally
-- `deactivate <id>` — Remove from project
-- `init` / `refresh` / `reset` — Project lifecycle
+Bash CLI (`set -euo pipefail`). Key subcommands:
+- `sync` — Rebuild core symlinks in global dirs (`~/.claude`, `~/.copilot`, `~/.agents`, `~/.vibe`)
+- `clean` — Remove non-symlinks from global dirs (stale manual copies)
+- `add <id>` — Copy a spec from cold library into the project
+- `refresh` — Scan project dirs, update matching specs from cold library, auto-commit
+- `init` — Create project directory structure
 - `list [--tag TAG] [--type TYPE]` / `search <query>` — Discovery
 - `generate-library` — Regenerate `library.json` from disk contents (preserves existing metadata)
 
@@ -64,14 +57,9 @@ Auto-detection is **additive-only** — never removes or overwrites existing pro
 
 `claude()`, `copilot()`, `opencode()` are wrapper functions that:
 1. Ensure an artifacts directory exists for the current repo
-2. Run `specs-sync auto --quiet`
+2. Run `specs-sync refresh --quiet`
 3. Pass `--add-dir` for the artifacts directory
 4. Auto-commit and push artifacts after the tool exits
-
-### Per-Project State
-
-- `.specs-manifest.json` in project roots tracks activated non-core specs
-- `~/.local/share/llm-specs/global-manifest.json` when not in a git repo
 
 ## Key Files
 
@@ -92,6 +80,5 @@ Auto-detection is **additive-only** — never removes or overwrites existing pro
 - `.gitattributes` enforces LF line endings (`* text=auto eol=lf`) for WSL/Windows compatibility
 - `jq` is the sole runtime dependency (installed by `install.sh`)
 - Skill frontmatter: only `name` and `description` fields; `description` must start with "Use when..." describing triggering conditions
-- Command frontmatter: supports `description`, `disable-model-invocation`, `arguments`
-- Adding new specs: create in `skills/`, `commands/`, or `agents/` → add entry to `library.json` → run `sync.sh`
+- Adding new specs: create in `skills/` or `agents/` → add entry to `library.json` → run `sync.sh`
 - Commit style: conventional commits (`fix:`, `feat:`, `refactor:`, `chore:`), WHY over WHAT
