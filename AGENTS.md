@@ -26,9 +26,9 @@ There is no build system, test suite, linter, or CI/CD. All scripts are pure Bas
 
 The central concept. Not all specs load in every LLM session — only relevant ones are activated.
 
-**Flow A — Machine sync** (`sync.sh`): Core specs are **symlinked** from cold storage (`~/.local/share/llm-specs/`) into global tool directories (`~/.claude/`, `~/.copilot/`). Vibe gets direct copies.
+**Flow A — Machine sync** (`sync.sh`): Core specs are **symlinked** from cold storage (`~/.local/share/llm-specs/`) into global tool directories (`~/.claude/`, `~/.copilot/`, `~/.agents/`, `~/.vibe/`).
 
-**Flow B — Repo init/refresh** (`specs-sync`): Non-core specs are **copied** into project-local directories (`.claude/`, `.github/`) so they're committed with the repo.
+**Flow B — Repo init/refresh** (`specs-sync`): Specs are **copied** into project-local directories (`.claude/`, `.github/`) via `specs-sync add` and updated via `specs-sync refresh`.
 
 ### Spec Types
 
@@ -40,22 +40,16 @@ The central concept. Not all specs load in every LLM session — only relevant o
 ### Core vs Non-Core
 
 - **Core** (`"core": true` in `library.json`): Always symlinked globally via `sync.sh`
-- **Non-core**: Activated per-project via triggers or `specs-sync activate`
-
-### Trigger-Based Auto-Detection
-
-Specs declare `triggers` in `library.json` with `files` and `extensions`. Shell wrappers for `claude`/`copilot` in `dot_bashrc` automatically run `specs-sync auto --quiet` before launching, which checks the project root for matching files and copies relevant specs.
-
-Auto-detection is **additive-only** — never removes or overwrites existing project copies.
+- **Non-core**: Added per-project via `specs-sync add`
 
 ### `specs-sync` CLI (`bin/specs-sync`)
 
-~1000 lines of Bash (`set -euo pipefail`). Key subcommands:
-- `sync` — Rebuild core symlinks in global dirs
-- `auto [--quiet]` — Auto-detect and activate based on project markers
-- `activate <id> [--global]` — Copy to project or symlink globally
-- `deactivate <id>` — Remove from project
-- `init` / `refresh` / `reset` — Project lifecycle
+Bash CLI (`set -euo pipefail`). Key subcommands:
+- `sync` — Rebuild core symlinks in global dirs (`~/.claude`, `~/.copilot`, `~/.agents`, `~/.vibe`)
+- `clean` — Remove non-symlinks from global dirs (stale manual copies)
+- `add <id>` — Copy a spec from cold library into the project
+- `refresh` — Scan project dirs, update matching specs from cold library, auto-commit
+- `init` — Create project directory structure
 - `list [--tag TAG] [--type TYPE]` / `search <query>` — Discovery
 - `generate-library` — Regenerate `library.json` from disk contents (preserves existing metadata)
 
@@ -63,14 +57,9 @@ Auto-detection is **additive-only** — never removes or overwrites existing pro
 
 `claude()`, `copilot()`, `opencode()` are wrapper functions that:
 1. Ensure an artifacts directory exists for the current repo
-2. Run `specs-sync auto --quiet`
+2. Run `specs-sync refresh --quiet`
 3. Pass `--add-dir` for the artifacts directory
 4. Auto-commit and push artifacts after the tool exits
-
-### Per-Project State
-
-- `.specs-manifest.json` in project roots tracks activated non-core specs
-- `~/.local/share/llm-specs/global-manifest.json` when not in a git repo
 
 ## Key Files
 

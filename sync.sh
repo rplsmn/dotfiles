@@ -26,7 +26,7 @@ cp "$REPO_DIR/dot_gitconfig" "$HOME/.gitconfig"
 
 # --- LLM tool directories ---
 echo "==> Syncing LLM tool configs"
-mkdir -p "$HOME/.claude" "$HOME/.copilot" "$HOME/.vibe/prompts"
+mkdir -p "$HOME/.claude" "$HOME/.copilot" "$HOME/.agents" "$HOME/.vibe/prompts"
 
 # --- Install specs-sync CLI (bootstrap — must happen before specs sync) ---
 echo "==> Installing specs-sync CLI"
@@ -39,25 +39,14 @@ echo "==> Syncing specs to library"
 LIBRARY_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/llm-specs"
 mkdir -p "$LIBRARY_DIR"
 # Clean and repopulate cold library (removes stale entries)
-rm -rf "$LIBRARY_DIR/skills" "$LIBRARY_DIR/commands" "$LIBRARY_DIR/agents"
+rm -rf "$LIBRARY_DIR/skills" "$LIBRARY_DIR/agents"
 cp -r "$REPO_DIR/skills" "$LIBRARY_DIR/"
 cp -r "$REPO_DIR/agents" "$LIBRARY_DIR/"
 cp "$REPO_DIR/library.json" "$LIBRARY_DIR/"
 
-# Initialize global manifest if it doesn't exist
-if [ ! -f "$LIBRARY_DIR/global-manifest.json" ]; then
-  echo '{"activated":[]}' > "$LIBRARY_DIR/global-manifest.json"
-fi
-
-# --- Activate core specs + rebuild symlinks (Claude + Copilot only) ---
+# --- Activate core specs + rebuild symlinks (all global dirs) ---
 echo "==> Activating core specs (global symlinks)"
 "$HOME/.local/bin/specs-sync" sync --quiet
-
-# --- Vibe distribution (direct copies — Vibe has its own layout) ---
-echo "==> Syncing Vibe specs"
-mkdir -p "$HOME/.vibe/skills" "$HOME/.vibe/prompts" "$HOME/.vibe/agents"
-cp -r "$REPO_DIR/skills"/* "$HOME/.vibe/skills/" 2>/dev/null || true
-cp "$REPO_DIR/agents"/*.md "$HOME/.vibe/agents/" 2>/dev/null || true
 
 # --- Global instructions ---
 cp "$REPO_DIR/global-instructions.md" "$HOME/.claude/CLAUDE.md"
