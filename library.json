@@ -37,6 +37,15 @@
       "triggers": {}
     },
     {
+      "id": "bash-defensive-patterns",
+      "type": "skill",
+      "name": "bash-defensive-patterns",
+      "description": "Master defensive Bash programming techniques for production-grade scripts. Use when writing robust shell scripts, CI/CD pipelines, or system utilities requiring fault tolerance and safety.",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
       "id": "brainstorming",
       "type": "skill",
       "name": "brainstorming",
@@ -473,6 +482,15 @@
       "triggers": {}
     },
     {
+      "id": "polyglot-test-agent",
+      "type": "skill",
+      "name": "polyglot-test-agent",
+      "description": "'Generates comprehensive, workable unit tests for any programming language using a multi-agent pipeline. Use when asked to generate tests, write unit tests, improve test coverage, add test coverage, create test files, or test a codebase. Supports C#, TypeScript, JavaScript, Python, Go, Rust, Java, and more. Orchestrates research, planning, and implementation phases to produce tests that compile, pass, and follow project conventions.'",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
       "id": "pptx",
       "type": "skill",
       "name": "pptx",
@@ -506,6 +524,15 @@
       "triggers": {}
     },
     {
+      "id": "r-data-science",
+      "type": "skill",
+      "name": "r-data-science",
+      "description": "R-first data science and statistical analysis with SQL as secondary language. Use when the user asks to analyze data in R, write R scripts, create tidyverse pipelines, build statistical models, work with time series (fable/tsibble), run machine learning workflows (tidymodels), query databases from R (DuckDB, dbplyr), build reproducible pipelines (targets), or parallelize computations (crew/mirai). Triggers on R, tidyverse, dplyr, ggplot2, targets, tidymodels, DuckDB, time series forecasting, or statistical modeling requests.",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
       "id": "receiving-code-review",
       "type": "skill",
       "name": "receiving-code-review",
@@ -529,6 +556,24 @@
         "pr",
         "quality"
       ],
+      "triggers": {}
+    },
+    {
+      "id": "rlang-conditions",
+      "type": "skill",
+      "name": "rlang-conditions",
+      "description": ">",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
+      "id": "rust-async-patterns",
+      "type": "skill",
+      "name": "rust-async-patterns",
+      "description": "Master Rust async programming with Tokio, async traits, error handling, and concurrent patterns. Use when building async Rust applications, implementing concurrent systems, or debugging async code.",
+      "core": false,
+      "tags": [],
       "triggers": {}
     },
     {
