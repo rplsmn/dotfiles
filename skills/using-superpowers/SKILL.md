@@ -26,6 +26,9 @@ This is not negotiable. This is not optional. You cannot rationalize your way ou
 ```dot
 digraph skill_flow {
     "User message received" [shape=doublecircle];
+    "About to EnterPlanMode?" [shape=doublecircle];
+    "Already brainstormed?" [shape=diamond];
+    "Invoke brainstorming skill" [shape=box];
     "Might any skill apply?" [shape=diamond];
     "Invoke Skill tool" [shape=box];
     "Announce: 'Using [skill] to [purpose]'" [shape=box];
@@ -33,6 +36,11 @@ digraph skill_flow {
     "Create TodoWrite todo per item" [shape=box];
     "Follow skill exactly" [shape=box];
     "Respond (including clarifications)" [shape=doublecircle];
+
+    "About to EnterPlanMode?" -> "Already brainstormed?";
+    "Already brainstormed?" -> "Invoke brainstorming skill" [label="no"];
+    "Already brainstormed?" -> "Might any skill apply?" [label="yes"];
+    "Invoke brainstorming skill" -> "Might any skill apply?";
 
     "User message received" -> "Might any skill apply?";
     "Might any skill apply?" -> "Invoke Skill tool" [label="yes, even 1%"];
@@ -85,15 +93,3 @@ The skill itself tells you which.
 ## User Instructions
 
 Instructions say WHAT, not HOW. "Add X" or "Fix Y" doesn't mean skip workflows.
-
-## Cold Specs Library
-
-Not all skills are loaded in every session. Additional specialized skills
-are available in the cold library. When you detect the user is working in
-a domain without matching skills loaded (e.g., R development, email
-drafting, ADR writing), suggest they run:
-
-- `specs-sync search <topic>` — find relevant skills by keyword
-- `specs-sync list --tag <tag>` — list skills by tag (e.g., `r`, `github`, `git`)
-- `specs-sync add <id>` — copy a spec from cold library into the project
-- `specs-sync status` — see what's currently active and what's available

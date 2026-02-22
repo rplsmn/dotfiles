@@ -24,6 +24,28 @@
       "triggers": {}
     },
     {
+      "id": "archive-artifacts",
+      "type": "skill",
+      "name": "archive-artifacts",
+      "description": "Archive old stale LLM files in the global artifacts folder",
+      "core": true,
+      "tags": [
+        "artifacts",
+        "cleanup",
+        "archive"
+      ],
+      "triggers": {}
+    },
+    {
+      "id": "brainstorming",
+      "type": "skill",
+      "name": "brainstorming",
+      "description": "\"You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation.\"",
+      "core": false,
+      "tags": [],
+      "triggers": {}
+    },
+    {
       "id": "brand-yml",
       "type": "skill",
       "name": "brand-yml",
@@ -47,7 +69,9 @@
       "name": "cli",
       "description": ">",
       "core": false,
-      "tags": [],
+      "tags": [
+        "R"
+      ],
       "triggers": {}
     },
     {
@@ -56,7 +80,10 @@
       "name": "content-creator",
       "description": "|",
       "core": false,
-      "tags": [],
+      "tags": [
+        "creative",
+        "content"
+      ],
       "triggers": {}
     },
     {
@@ -65,7 +92,11 @@
       "name": "cran-extrachecks",
       "description": ">",
       "core": false,
-      "tags": [],
+      "tags": [
+        "r",
+        "package",
+        "cran"
+      ],
       "triggers": {}
     },
     {
@@ -74,7 +105,11 @@
       "name": "create-release-checklist",
       "description": ">",
       "core": false,
-      "tags": [],
+      "tags": [
+        "r",
+        "package",
+        "cran"
+      ],
       "triggers": {}
     },
     {
@@ -82,8 +117,10 @@
       "type": "skill",
       "name": "critical-code-reviewer",
       "description": ">",
-      "core": false,
-      "tags": [],
+      "core": true,
+      "tags": [
+        "review"
+      ],
       "triggers": {}
     },
     {
@@ -117,7 +154,9 @@
       "name": "describe-design",
       "description": ">",
       "core": false,
-      "tags": [],
+      "tags": [
+        "design"
+      ],
       "triggers": {}
     },
     {
@@ -200,7 +239,9 @@
       "name": "editor",
       "description": "|",
       "core": true,
-      "tags": [],
+      "tags": [
+        "writing"
+      ],
       "triggers": {}
     },
     {
@@ -267,7 +308,22 @@
       "name": "frontend-design",
       "description": "Create distinctive, production-grade frontend interfaces with high design quality. Use this skill when the user asks to build web components, pages, artifacts, posters, or applications (examples include websites, landing pages, dashboards, React components, HTML/CSS layouts, or when styling/beautifying any web UI). Generates creative, polished code and UI design that avoids generic AI aesthetics.",
       "core": false,
-      "tags": [],
+      "tags": [
+        "design",
+        "ui",
+        "creative"
+      ],
+      "triggers": {}
+    },
+    {
+      "id": "generate-rpkg-consumer-skill",
+      "type": "skill",
+      "name": "generate-rpkg-consumer-skill",
+      "description": "Generate a condensed consumer skill for a package/library/tool with an API",
+      "core": false,
+      "tags": [
+        "r"
+      ],
       "triggers": {}
     },
     {
@@ -276,7 +332,22 @@
       "name": "git-commit",
       "description": "'Execute git commit with conventional commit message analysis, intelligent staging, and message generation. Use when user asks to commit changes, create a git commit, or mentions \"/commit\". Supports: (1) Auto-detecting type and scope from changes, (2) Generating conventional commit messages from diff, (3) Interactive commit with optional type/scope/description overrides, (4) Intelligent file staging for logical grouping'",
       "core": true,
-      "tags": [],
+      "tags": [
+        "git"
+      ],
+      "triggers": {}
+    },
+    {
+      "id": "implementing-team",
+      "type": "skill",
+      "name": "implementing-team",
+      "description": "\"Dispatch an implementation team: Haiku messengers coordinate Opus 4.6 coders (TDD, lean) and Opus 4.6 reviewers to implement tasks from existing plans.\"",
+      "core": true,
+      "tags": [
+        "agents",
+        "team",
+        "implementation"
+      ],
       "triggers": {}
     },
     {
@@ -285,7 +356,9 @@
       "name": "internal-comms",
       "description": "A set of resources to help me write all kinds of internal communications, using the formats that my company likes to use. Claude should use this skill whenever asked to write some sort of internal communications (status reports, leadership updates, 3P updates, company newsletters, FAQs, incident reports, project updates, etc.).",
       "core": false,
-      "tags": [],
+      "tags": [
+        "writing"
+      ],
       "triggers": {}
     },
     {
@@ -294,7 +367,9 @@
       "name": "lifecycle",
       "description": ">",
       "core": false,
-      "tags": [],
+      "tags": [
+        "r"
+      ],
       "triggers": {}
     },
     {
@@ -328,7 +403,11 @@
       "name": "microcopy",
       "description": "UI copy and microcopy guidelines. Use when writing UI text, buttons, error messages, empty states, onboarding, or any user-facing copy. Triggers on i18n translation, UI text writing, or copy improvement tasks. Supports both Chinese and English.",
       "core": false,
-      "tags": [],
+      "tags": [
+        "ui",
+        "writing",
+        "design"
+      ],
       "triggers": {}
     },
     {
@@ -337,7 +416,10 @@
       "name": "nano-banana-pro",
       "description": "Generate or edit images via Gemini 3 Pro Image (Nano Banana Pro).",
       "core": false,
-      "tags": [],
+      "tags": [
+        "creative",
+        "image"
+      ],
       "triggers": {}
     },
     {
@@ -375,6 +457,19 @@
       "triggers": {}
     },
     {
+      "id": "planning-team",
+      "type": "skill",
+      "name": "planning-team",
+      "description": "\"Dispatch a planning team: Haiku messengers coordinate Opus planners and Opus reviewers to produce reviewed implementation plans for one or more tasks.\"",
+      "core": true,
+      "tags": [
+        "agents",
+        "team",
+        "planning"
+      ],
+      "triggers": {}
+    },
+    {
       "id": "pptx",
       "type": "skill",
       "name": "pptx",
@@ -389,7 +484,10 @@
       "name": "pr-create",
       "description": "Creates a pull request from current changes, monitors GitHub CI, and debugs any failures until CI passes. Use this when the user says \"create pr\", \"make a pr\", \"open pull request\", \"submit pr\", \"pr for these changes\", or wants to get their current work into a reviewable PR. Assumes the project uses git, is hosted on GitHub, and has GitHub Actions CI with automated checks (lint, build, tests, etc.). Does NOT merge - stops when CI passes and provides the PR link.",
       "core": false,
-      "tags": [],
+      "tags": [
+        "git",
+        "github"
+      ],
       "triggers": {}
     },
     {
@@ -398,7 +496,10 @@
       "name": "quarto-authoring",
       "description": ">",
       "core": false,
-      "tags": [],
+      "tags": [
+        "quarto",
+        "writing"
+      ],
       "triggers": {}
     },
     {
@@ -433,7 +534,11 @@
       "name": "shiny-bslib",
       "description": "Build modern Shiny dashboards and applications using bslib (Bootstrap 5). Use when creating new Shiny apps, modernizing legacy apps (fluidPage, fluidRow/column, tabsetPanel, wellPanel, shinythemes), or working with bslib page layouts, grid systems, cards, value boxes, navigation, sidebars, filling layouts, theming, accordions, tooltips, popovers, toasts, or bslib inputs. Assumes familiarity with basic Shiny.",
       "core": false,
-      "tags": [],
+      "tags": [
+        "r",
+        "shiny",
+        "ui"
+      ],
       "triggers": {}
     },
     {
@@ -442,7 +547,12 @@
       "name": "shiny-bslib-theming",
       "description": "Advanced theming for Shiny apps using bslib and Bootstrap 5. Use when customizing app appearance with bs_theme(), Bootswatch themes, custom colors, typography, brand.yml integration, Bootstrap Sass variables, custom Sass/CSS rules, dark mode and color modes, dynamic theme switching, real-time theming, theme inspection, or making R plots match the app theme with thematic.",
       "core": false,
-      "tags": [],
+      "tags": [
+        "r",
+        "shiny",
+        "ui",
+        "creative"
+      ],
       "triggers": {}
     },
     {
@@ -472,8 +582,46 @@
       "name": "skill-creator",
       "description": "Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Claude's capabilities with specialized knowledge, workflows, or tool integrations.",
       "core": true,
-      "tags": [],
+      "tags": [
+        "llm"
+      ],
       "triggers": {}
+    },
+    {
+      "id": "solve-batch",
+      "type": "skill",
+      "name": "solve-batch",
+      "description": "\"Solve multiple independent GitHub issues in parallel using git worktrees. Dispatches one agent per issue, then blind cross-reviews.\"",
+      "core": false,
+      "tags": [
+        "github",
+        "issues",
+        "parallel",
+        "worktrees"
+      ],
+      "triggers": {
+        "files": [
+          ".github/"
+        ]
+      }
+    },
+    {
+      "id": "solve-issue",
+      "type": "skill",
+      "name": "solve-issue",
+      "description": "\"Solve a GitHub issue end-to-end: plan, implement (TDD), review, open PR. Uses subagents for each phase.\"",
+      "core": true,
+      "tags": [
+        "github",
+        "issues",
+        "tdd",
+        "pr"
+      ],
+      "triggers": {
+        "files": [
+          ".github/"
+        ]
+      }
     },
     {
       "id": "subagent-driven-development",
@@ -494,7 +642,10 @@
       "name": "supabase-postgres-best-practices",
       "description": "Postgres performance optimization and best practices from Supabase. Use this skill when writing, reviewing, or optimizing Postgres queries, schema designs, or database configurations.",
       "core": false,
-      "tags": [],
+      "tags": [
+        "db",
+        "postgres"
+      ],
       "triggers": {}
     },
     {
@@ -556,8 +707,29 @@
       "name": "testing-r-packages",
       "description": ">",
       "core": false,
-      "tags": [],
+      "tags": [
+        "r",
+        "test",
+        "package"
+      ],
       "triggers": {}
+    },
+    {
+      "id": "triage-issues",
+      "type": "skill",
+      "name": "triage-issues",
+      "description": "\"Solve a GitHub issue end-to-end: plan, implement (TDD), review, open PR. Uses subagents for each phase.\"",
+      "core": true,
+      "tags": [
+        "github",
+        "issues",
+        "triage"
+      ],
+      "triggers": {
+        "files": [
+          ".github/"
+        ]
+      }
     },
     {
       "id": "using-git-worktrees",
@@ -604,7 +776,11 @@
       "name": "vitest",
       "description": "Vitest fast unit testing framework powered by Vite with Jest-compatible API. Use when writing tests, mocking, configuring coverage, or working with test filtering and fixtures.",
       "core": false,
-      "tags": [],
+      "tags": [
+        "js",
+        "test",
+        "vite"
+      ],
       "triggers": {}
     },
     {
@@ -613,7 +789,11 @@
       "name": "webapp-testing",
       "description": "Toolkit for interacting with and testing local web applications using Playwright. Supports verifying frontend functionality, debugging UI behavior, capturing browser screenshots, and viewing browser logs.",
       "core": false,
-      "tags": [],
+      "tags": [
+        "web",
+        "test",
+        "headless"
+      ],
       "triggers": {}
     },
     {
@@ -673,184 +853,8 @@
       "name": "xlsx",
       "description": "\"Use this skill any time a spreadsheet file is the primary input or output. This means any task where the user wants to: open, read, edit, or fix an existing .xlsx, .xlsm, .csv, or .tsv file (e.g., adding columns, computing formulas, formatting, charting, cleaning messy data); create a new spreadsheet from scratch or from other data sources; or convert between tabular file formats. Trigger especially when the user references a spreadsheet file by name or path — even casually (like \\\"the xlsx in my downloads\\\") — and wants something done to it or produced from it. Also trigger for cleaning or restructuring messy tabular data files (malformed rows, misplaced headers, junk data) into proper spreadsheets. The deliverable must be a spreadsheet file. Do NOT trigger when the primary deliverable is a Word document, HTML report, standalone Python script, database pipeline, or Google Sheets API integration, even if tabular data is involved.\"",
       "core": false,
-      "tags": [],
-      "triggers": {}
-    },
-    {
-      "id": "archive-artifacts",
-      "type": "skill",
-      "name": "archive-artifacts",
-      "description": "Archive old stale LLM files in the global artifacts folder",
-      "core": true,
       "tags": [
-        "artifacts",
-        "cleanup",
-        "archive"
-      ],
-      "triggers": {}
-    },
-    {
-      "id": "brainstorm",
-      "type": "skill",
-      "name": "brainstorm",
-      "description": "\"You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores requirements and design before implementation.\"",
-      "core": true,
-      "tags": [
-        "brainstorming",
-        "design",
-        "creative"
-      ],
-      "triggers": {}
-    },
-    {
-      "id": "execute-plan",
-      "type": "skill",
-      "name": "execute-plan",
-      "description": "Execute plan in batches with review checkpoints",
-      "core": true,
-      "tags": [
-        "plans",
-        "execution",
-        "batches"
-      ],
-      "triggers": {}
-    },
-    {
-      "id": "generate-rpkg-consumer-skill",
-      "type": "skill",
-      "name": "generate-rpkg-consumer-skill",
-      "description": "Generate a condensed consumer skill for a package/library/tool with an API",
-      "core": false,
-      "tags": [],
-      "triggers": {}
-    },
-    {
-      "id": "implementing-team",
-      "type": "skill",
-      "name": "implementing-team",
-      "description": "\"Dispatch an implementation team: Haiku messengers coordinate Opus 4.6 coders (TDD, lean) and Opus 4.6 reviewers to implement tasks from existing plans.\"",
-      "core": true,
-      "tags": [
-        "agents",
-        "team",
-        "implementation"
-      ],
-      "triggers": {}
-    },
-    {
-      "id": "planning-team",
-      "type": "skill",
-      "name": "planning-team",
-      "description": "\"Dispatch a planning team: Haiku messengers coordinate Opus planners and Opus reviewers to produce reviewed implementation plans for one or more tasks.\"",
-      "core": true,
-      "tags": [
-        "agents",
-        "team",
-        "planning"
-      ],
-      "triggers": {}
-    },
-    {
-      "id": "solve-batch",
-      "type": "skill",
-      "name": "solve-batch",
-      "description": "\"Solve multiple independent GitHub issues in parallel using git worktrees. Dispatches one agent per issue, then blind cross-reviews.\"",
-      "core": false,
-      "tags": [
-        "github",
-        "issues",
-        "parallel",
-        "worktrees"
-      ],
-      "triggers": {
-        "files": [
-          ".github/"
-        ]
-      }
-    },
-    {
-      "id": "solve-issue",
-      "type": "skill",
-      "name": "solve-issue",
-      "description": "\"Solve a GitHub issue end-to-end: plan, implement (TDD), review, open PR. Uses subagents for each phase.\"",
-      "core": true,
-      "tags": [
-        "github",
-        "issues",
-        "tdd",
-        "pr"
-      ],
-      "triggers": {
-        "files": [
-          ".github/"
-        ]
-      }
-    },
-    {
-      "id": "team-review-js",
-      "type": "skill",
-      "name": "team-review-js",
-      "description": "JavaScript-specific review guidance companion for planning-team and implementing-team commands.",
-      "core": true,
-      "tags": [
-        "review",
-        "team",
-        "javascript"
-      ],
-      "triggers": {}
-    },
-    {
-      "id": "team-review-r",
-      "type": "skill",
-      "name": "team-review-r",
-      "description": "R-specific review guidance companion for planning-team and implementing-team commands.",
-      "core": true,
-      "tags": [
-        "review",
-        "team",
-        "r"
-      ],
-      "triggers": {}
-    },
-    {
-      "id": "team-review-rust",
-      "type": "skill",
-      "name": "team-review-rust",
-      "description": "Rust-specific review guidance companion for planning-team and implementing-team commands.",
-      "core": true,
-      "tags": [
-        "review",
-        "team",
-        "rust"
-      ],
-      "triggers": {}
-    },
-    {
-      "id": "triage-issues",
-      "type": "skill",
-      "name": "triage-issues",
-      "description": "\"Solve a GitHub issue end-to-end: plan, implement (TDD), review, open PR. Uses subagents for each phase.\"",
-      "core": true,
-      "tags": [
-        "github",
-        "issues",
-        "triage"
-      ],
-      "triggers": {
-        "files": [
-          ".github/"
-        ]
-      }
-    },
-    {
-      "id": "write-plan",
-      "type": "skill",
-      "name": "write-plan",
-      "description": "Create detailed implementation plan with bite-sized tasks",
-      "core": true,
-      "tags": [
-        "planning",
-        "tasks"
+        "excel"
       ],
       "triggers": {}
     },
