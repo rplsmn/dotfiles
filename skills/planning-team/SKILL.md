@@ -15,10 +15,6 @@ Brainstorm interactively with the user to produce a validated spec, then dispatc
 
 Parse `mode` from `$ARGUMENTS`. If `$ARGUMENTS` contains `sequential`, set mode to sequential. Otherwise default to `parallel`.
 
-- **lang**: Language override (optional)
-  - Examples: `r`, `js`, `python`, `go`, `rust`
-  - If not provided, automatic detection runs in Phase 0
-
 ## Team Structure
 
 ```
@@ -26,17 +22,18 @@ Orchestrator (you)
 │
 ├── Phase 0: Context Gathering
 │   ├── Explore subagent → reads source files + project docs
-│   └── Language Detection → infers project language from flags, docs, or file markers
+│   └── Skill Discovery → finds relevant skills for the stack via specs-sync
 │
 ├── Phase 1: Brainstorming (you + user, interactive)
 │   ├── Ask questions one at a time
 │   ├── Present design in sections, validate each
-│   └── Output: validated spec + task list + source file list
+│   ├── Synthesize review criteria from skills + docs + context
+│   └── Output: validated spec + task list + source file list + review criteria
 │
 ├── Phase 2: Plan-Review Dispatch (per task)
 │   └── Opus Planner-Reviewer agent
 │       ├── Writes plan from validated spec
-│       ├── Dispatches Opus Reviewer sub-subagent
+│       ├── Dispatches Opus Reviewer sub-subagent (critical-code-reviewer methodology)
 │       ├── Reads review, applies fixes to its own plan
 │       └── Loops until READY (max 3 rounds)
 │
@@ -48,8 +45,8 @@ Orchestrator (you)
 
 You are the orchestrator. Your job is:
 
-1. **Gather context** — dispatch Explore subagent, read project docs, detect language
-2. **Brainstorm with the user** — interactive design session producing a validated spec
+1. **Gather context** — dispatch Explore subagent, read project docs, discover relevant skills
+2. **Brainstorm with the user** — interactive design session producing a validated spec and review criteria
 3. **Dispatch planner-reviewer agents** — one Opus agent per task
 4. **Collect results** — wait for all agents, report status
 5. **Preserve your context** — do NOT read the full plans; rely on agent status reports
@@ -63,18 +60,13 @@ Before engaging the user:
 1. Read project docs (CLAUDE.md, AGENTS.md, README) for conventions and structure
 2. Dispatch an **Explore subagent** (`subagent_type: Explore`) to read source files relevant to the user's prompt
 3. Identify the artifacts directory: `~/.artifacts/<project>/plans/` or the project's designated plans folder
-4. **Detect language**:
-   - If `$ARGUMENTS` contains a language flag (e.g., `--lang r`), use that
-   - Otherwise, check AGENTS.md / CLAUDE.md for stated tech stack
-   - Fallback: scan for file markers (.Rproj, package.json, Cargo.toml, go.mod, pyproject.toml, etc.)
-   - If a companion file `team-review-<lang>.md` exists in this skill's directory, read it once for injection into agent prompts
-5. Note the detected language (or user-provided override) for use in Phase 2
+4. **Discover relevant skills**: Run `specs-sync list` and `specs-sync search <terms>` (using terms from the project's stack, frameworks, domain) to find skills that provide expertise for this project's technology. Read the matched skills — they contain patterns, idioms, and common pitfalls that will inform review criteria in Phase 1. **Record the absolute file paths** of each relevant skill (e.g. `~/.local/share/llm-specs/skills/<name>/SKILL.md`) — these will be passed to subagents so they can read the full skill content themselves.
 
 ---
 
 ## Phase 1: Brainstorming (Interactive)
 
-**Goal**: Produce a validated spec. ALL design decisions are made HERE, not by the planner.
+**Goal**: Produce a validated spec AND review criteria. ALL design decisions are made HERE, not by the planner.
 
 **This phase is non-negotiable. It always happens before any plan dispatch.**
 
@@ -92,8 +84,14 @@ Before engaging the user:
    - Per task: what to build, data flow, naming, design decisions made + rationale
    - Source files each planner needs to read
    - Shared conventions and constraints
+6. **Synthesize review criteria** — as the FINAL step before dispatch, derive review criteria from three sources and present them to the user:
+   - **Skills**: What patterns, idioms, and pitfalls do the discovered skills highlight for this stack? What does "good" look like according to the expertise available?
+   - **Project docs**: What conventions, priorities, architectural constraints, and testing strategies does the project mandate?
+   - **Brainstorming context**: What did the user emphasize? What scope decisions create risk? What areas need extra scrutiny?
 
-**Exit criteria**: User explicitly confirms the spec is correct. No ambiguity in scope or approach.
+   Present the criteria as a short numbered list: "Here's what I'll hold the plans to — does this cover what matters?" The user validates or adjusts. These criteria become part of the spec.
+
+**Exit criteria**: User explicitly confirms the spec AND review criteria are correct. No ambiguity in scope, approach, or evaluation standards.
 
 ### YAGNI
 
@@ -118,9 +116,16 @@ You are a planner-reviewer agent. Write a detailed implementation plan, get it r
 
 <TASK_DESCRIPTION from validated spec — include ALL design decisions, naming conventions, scope, rationale>
 
-## Language Guidance
+## Review Criteria
 
-<LANGUAGE_GUIDANCE>
+The orchestrator derived these criteria from the project's skills, documentation, and brainstorming context. The reviewer will evaluate your plan against them.
+
+<REVIEW_CRITERIA>
+
+## Reference Skills
+
+The criteria above were derived from these skills. Read them for full stack-specific guidance (patterns, idioms, pitfalls):
+<LIST_OF_SKILL_FILE_PATHS>
 
 ## Source Files to Read
 
@@ -161,7 +166,7 @@ The plan should be detailed enough that implementation is near copy-paste trivia
 Dispatch a **Task subagent** (model: opus, subagent_type: code-reviewer) with this prompt:
 
 ```
-You are a code reviewer. Review the implementation plan against the actual source code.
+You are a critical plan reviewer. Review the implementation plan against the actual source code using an adversarial mindset — guilty until proven exceptional.
 
 ## Plan File
 Read this file: <PLAN_FILE_PATH>
@@ -169,14 +174,23 @@ Read this file: <PLAN_FILE_PATH>
 ## Validated Spec (what was agreed with the user)
 <SPEC_SUMMARY>
 
-## Language Guidance
+## Review Criteria (derived from project context)
 
-<LANGUAGE_GUIDANCE>
+Apply these project-specific criteria as your evaluation framework:
+
+<REVIEW_CRITERIA>
+
+## Reference Skills
+
+Read these for full stack-specific guidance to inform your review:
+<SAME SKILL FILE PATHS AS PLANNER>
 
 ## Source Files to Read (you MUST read these independently — do NOT trust the plan's claims about them)
 <SAME FILE LIST AS PLANNER>
 
-## Review Criteria
+## Review Methodology
+
+Apply the critical-code-reviewer approach: adversarial, thorough, zero tolerance for hand-waving.
 
 1. Compare proposed function code against actual source code LINE BY LINE
 2. Check every type contract, method dispatch, guard condition against actual code structures
@@ -185,23 +199,29 @@ Read this file: <PLAN_FILE_PATH>
 5. Verify API boundary contracts are correctly stated
 6. Look for missing edge cases
 7. Check convention compliance (naming, patterns, style)
+8. Evaluate against EACH review criterion above — flag gaps explicitly
 
 ## Output Format
 
-For each issue found:
-- **Severity**: CRITICAL / IMPORTANT / SUGGESTION
+Use severity tiers:
+- **BLOCKING**: Must fix before plan can proceed. Incorrect logic, wrong API contracts, missing critical steps.
+- **REQUIRED**: Significant issues. Convention violations, missing edge cases, incomplete type contracts.
+- **SUGGESTION**: Improvements. Better naming, cleaner structure, additional test cases.
+
+For each issue:
+- **Severity**: BLOCKING / REQUIRED / SUGGESTION
 - **Location**: plan section + source file:line reference
 - **Problem**: what's wrong
 - **Fix**: specific suggested fix
 
-End with verdict: **READY** or **NEEDS FIXES** (list which issues must be fixed)
+End with verdict: **READY** or **NEEDS FIXES** (list which BLOCKING and REQUIRED issues must be fixed)
 ```
 
 ### Step 4: Apply Fixes
 
 If the reviewer says **NEEDS FIXES**:
 1. Read the review carefully
-2. Apply ALL CRITICAL and IMPORTANT fixes to the plan file (you wrote the plan — you understand the reasoning behind each decision, so you can apply fixes intelligently, not mechanically)
+2. Apply ALL BLOCKING and REQUIRED fixes to the plan file (you wrote the plan — you understand the reasoning behind each decision, so you can apply fixes intelligently, not mechanically)
 3. Go back to Step 3 — dispatch the reviewer again, adding to its prompt: "This is review round N. Verify previous fixes are correctly applied. Also look for NEW issues that the fixes may have introduced."
 4. Repeat until the reviewer says **READY** or you reach 3 review rounds
 
@@ -247,14 +267,15 @@ Plus: total artifact count, any tasks needing human attention, and suggested nex
 
 - **Brainstorming is non-negotiable** — Phase 1 ALWAYS happens before any plan dispatch
 - **One question at a time** — never batch questions during brainstorming
+- **Review criteria are derived JIT** — synthesized from discovered skills, project docs, and brainstorming context; never hardcoded or assumed
 - **Planners and reviewers are Opus** — thorough reasoning required
 - **Planner revises its own plan** — it has the context of WHY each decision was made
 - **Reviewer MUST read source code independently** — not just the plan
+- **Reviewer uses critical-code-reviewer methodology** — adversarial mindset, severity tiers (BLOCKING > REQUIRED > SUGGESTION)
 - **Review is iterated** — loop until READY, max 3 rounds
 - **LINE BY LINE is the standard** — the reviewer compares proposed code against actual source
 - **Orchestrator stays lean after Phase 1** — don't read plan contents during Phase 2
 - **Final review persisted** — saved to disk alongside the plan for traceability
 - **Artifacts are permanent** — written to `~/.artifacts/<project>/plans/`, never ephemeral
 - **Sequential mode chains context** — each agent gets the previous task's plan path as "Prior work"
-- **Language guidance is injected** — companion files are read once by orchestrator, passed to all agents
 - **Never start implementing** — this command produces plans only

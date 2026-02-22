@@ -22,14 +22,15 @@ Orchestrator (you)
 │
 ├── Phase 0: Context Gathering
 │   ├── Locate plans, read project docs
-│   ├── Detect programming language and load guidance
+│   ├── Skill Discovery → finds relevant skills for the stack via specs-sync
+│   ├── Derive review criteria from skills + docs + plans
 │   └── Ensure feature branch exists
 │
 ├── Phase 1: Dispatch Coder-Reviewer Agents
 │   └── Per task: Opus agent (isolation: worktree if parallel)
 │       ├── Implements with TDD (red → green → refactor)
 │       ├── Commits implementation
-│       ├── Dispatches Opus Reviewer sub-subagent
+│       ├── Dispatches Opus Reviewer sub-subagent (critical-code-reviewer methodology)
 │       ├── Reads review, applies fixes, commits fixes
 │       ├── Loops until LGTM (max 3 rounds)
 │       └── Reports: status, files, tests, decision log
@@ -49,7 +50,7 @@ Orchestrator (you)
 ## Your Role (Orchestrator)
 
 1. **Locate the plans** — each task must have an existing plan. If no plan exists, stop and tell the user to run `/planning-team` first.
-2. **Prepare context** — read project docs for conventions, detect the test command and programming language
+2. **Prepare context** — read project docs for conventions, detect the test command, discover relevant skills, derive review criteria
 3. **Create feature branch** if on main: `git checkout -b feature/<description>`
 4. **Dispatch agents** — one Opus agent per task
 5. **Merge worktree branches** (parallel mode) — merge each agent's branch into the feature branch
@@ -61,27 +62,16 @@ Orchestrator (you)
 ## Phase 0: Context Gathering
 
 1. Read project docs (CLAUDE.md, AGENTS.md) for conventions, test command, and coding style
-2. **Detect programming language** and load language-specific review guidance (see Language Detection below)
+2. **Discover relevant skills**: Run `specs-sync list` and `specs-sync search <terms>` (using terms from the project's stack, frameworks, domain) to find skills that provide expertise for this project's technology. Read the matched skills — they contain patterns, idioms, and common pitfalls that inform review criteria. **Record the absolute file paths** of each relevant skill (e.g. `~/.local/share/llm-specs/skills/<name>/SKILL.md`) — these will be passed to subagents so they can read the full skill content themselves.
 3. Identify the implementation plans from the user's prompt or the artifacts directory
 4. Detect the test command (from project docs or common patterns like `npm test`, `pytest`, `cargo test`, `go test`, etc.)
 5. Ensure you're on a feature branch. If on main, create one: `git checkout -b feature/<description>`
+6. **Derive review criteria**: Before dispatching any agents, synthesize review criteria from three sources:
+   - **Skills**: What patterns, idioms, and pitfalls do the discovered skills highlight for this stack? What does "good" look like according to the expertise available?
+   - **Project docs**: What conventions, priorities, architectural constraints, and testing strategies does the project mandate?
+   - **Plans**: What risks do the implementation plans flag? What areas are complex or novel enough to warrant extra scrutiny?
 
-### Language Detection
-
-1. **Check for explicit language flag**: If `$ARGUMENTS` contains `--lang <language>` (e.g., `--lang rust`), use that language.
-2. **Check project docs**: Look in AGENTS.md / CLAUDE.md for stated tech stack (What languages/frameworks are mentioned as primary?).
-3. **Fallback: Scan for file markers** in project root:
-   - `.Rproj` → R
-   - `package.json` → JavaScript/Node.js
-   - `Cargo.toml` → Rust
-   - `go.mod` → Go
-   - `requirements.txt` or `setup.py` or `pyproject.toml` → Python
-   - (Use the first one found as the detected language)
-4. **Locate language-specific review guidance**:
-   - If a companion file `team-review-<language>.md` exists in this skill's directory (e.g., `team-review-r.md`, `team-review-rust.md`), read it fully.
-   - This file contains critical language-specific review points, type system guidance, common pitfalls, and testing considerations.
-   - Carry this content into agent prompts as `<LANGUAGE_GUIDANCE>` (see Coder-Reviewer and Reviewer prompts below).
-   - If no companion file exists for the detected language, `<LANGUAGE_GUIDANCE>` is empty or omitted (use generic criteria only).
+   Write the criteria as a short numbered list. These are injected into every agent prompt as `<REVIEW_CRITERIA>`.
 
 ---
 
@@ -112,11 +102,16 @@ Read the plan FIRST: <PLAN_FILE_PATH>
 
 <TEST_COMMAND>
 
-## Language-Specific Guidance
+## Review Criteria
 
-<LANGUAGE_GUIDANCE>
+The orchestrator derived these criteria from the project's skills, documentation, and implementation plans. The reviewer will evaluate your code against them.
 
-(The orchestrator injects language-specific review criteria here. This section contains critical things to watch for when implementing and testing code in <LANGUAGE>. If no language-specific companion exists, this may be empty.)
+<REVIEW_CRITERIA>
+
+## Reference Skills
+
+The criteria above were derived from these skills. Read them for full stack-specific guidance (patterns, idioms, pitfalls):
+<LIST_OF_SKILL_FILE_PATHS>
 
 ## Working Directory
 
@@ -165,7 +160,7 @@ If the plan is followed exactly with no surprises, the decision log is empty. Th
 After all plan steps are implemented and tests pass, dispatch an **Opus Reviewer subagent** (model: opus, subagent_type: code-reviewer) with this prompt:
 
 ```
-You are a code reviewer. Review the implementation against the plan.
+You are a critical code reviewer. Review the implementation against the plan using an adversarial mindset — guilty until proven exceptional.
 
 ## Plan File
 Read this: <PLAN_FILE_PATH>
@@ -173,11 +168,16 @@ Read this: <PLAN_FILE_PATH>
 ## Test Command
 <TEST_COMMAND>
 
-## Language-Specific Guidance
+## Review Criteria (derived from project context)
 
-<LANGUAGE_GUIDANCE>
+Apply these project-specific criteria as your evaluation framework:
 
-(Same language-specific criteria as injected into the coder prompt. Use these to guide your critical assessment.)
+<REVIEW_CRITERIA>
+
+## Reference Skills
+
+Read these for full stack-specific guidance to inform your review:
+<SAME SKILL FILE PATHS AS CODER>
 
 ## Review Process
 
@@ -191,7 +191,7 @@ Read this: <PLAN_FILE_PATH>
    - Are guard conditions, error handling, and API boundary contracts correct?
    - Are there gaps or deviations from the plan?
 
-4. **Code quality**:
+4. **Code quality** (apply critical-code-reviewer methodology — adversarial, thorough):
    - Clean, minimal, no dead code, no over-engineering?
    - Convention compliance (naming, patterns, style)?
    - Any risks to existing functionality?
@@ -203,22 +203,29 @@ Read this: <PLAN_FILE_PATH>
    - Do they cover the edge cases listed in the plan?
    - Are tests sensitive to breaking changes? (would they catch a regression?)
 
+6. **Evaluate against EACH review criterion** — flag gaps explicitly
+
 ## Output
 
+Use severity tiers:
+- **BLOCKING**: Must fix before merge. Incorrect logic, failing tests, wrong API contracts.
+- **REQUIRED**: Significant issues. Convention violations, missing edge cases, incomplete contracts.
+- **SUGGESTION**: Improvements. Better naming, cleaner structure, additional test cases.
+
 For each issue:
-- **Severity**: CRITICAL / IMPORTANT / SUGGESTION
+- **Severity**: BLOCKING / REQUIRED / SUGGESTION
 - **File:line**: where the issue is
 - **Problem**: what's wrong
 - **Fix**: specific, actionable fix
 
-End with verdict: **LGTM** or **NEEDS FIXES** (list which)
+End with verdict: **LGTM** or **NEEDS FIXES** (list which BLOCKING and REQUIRED issues must be fixed)
 ```
 
 ### Step 6: Fix Loop
 
 If the reviewer says **NEEDS FIXES**:
 1. Read the review carefully
-2. Apply ALL CRITICAL and IMPORTANT fixes (you wrote the code — you understand the reasoning)
+2. Apply ALL BLOCKING and REQUIRED fixes (you wrote the code — you understand the reasoning)
 3. Run `<TEST_COMMAND>` to confirm tests still pass
 4. Commit the fixes: `git commit -am "fix: address review round N feedback"`
 5. Add any new decisions to the decision log
@@ -308,9 +315,11 @@ Finally: branch name, commit count, and the PR URL.
 ## Rules
 
 - **Plans must exist** — this command implements existing plans, it does not create them
+- **Review criteria are derived JIT** — synthesized from discovered skills, project docs, and implementation plans; never hardcoded or assumed
 - **Coders and reviewers are Opus** — high-effort, maximum quality
 - **TDD is non-negotiable** — red → green → refactor, always
 - **Lean approach** — smallest code that works, no speculative features
+- **Reviewer uses critical-code-reviewer methodology** — adversarial mindset, severity tiers (BLOCKING > REQUIRED > SUGGESTION)
 - **Review is iterated** — loop until LGTM, max 3 rounds
 - **No review artifacts** — reviews are ephemeral in the agent's context, not saved to disk
 - **Decision log is mandatory** — every plan deviation or ambiguity resolution is logged and surfaced
