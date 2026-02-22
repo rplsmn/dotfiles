@@ -41,8 +41,10 @@
       "type": "skill",
       "name": "bash-defensive-patterns",
       "description": "Master defensive Bash programming techniques for production-grade scripts. Use when writing robust shell scripts, CI/CD pipelines, or system utilities requiring fault tolerance and safety.",
-      "core": false,
-      "tags": [],
+      "core": true,
+      "tags": [
+        "bash"
+      ],
       "triggers": {}
     },
     {
@@ -486,8 +488,10 @@
       "type": "skill",
       "name": "polyglot-test-agent",
       "description": "'Generates comprehensive, workable unit tests for any programming language using a multi-agent pipeline. Use when asked to generate tests, write unit tests, improve test coverage, add test coverage, create test files, or test a codebase. Supports C#, TypeScript, JavaScript, Python, Go, Rust, Java, and more. Orchestrates research, planning, and implementation phases to produce tests that compile, pass, and follow project conventions.'",
-      "core": false,
-      "tags": [],
+      "core": true,
+      "tags": [
+        "test"
+      ],
       "triggers": {}
     },
     {
@@ -529,7 +533,10 @@
       "name": "r-data-science",
       "description": "R-first data science and statistical analysis with SQL as secondary language. Use when the user asks to analyze data in R, write R scripts, create tidyverse pipelines, build statistical models, work with time series (fable/tsibble), run machine learning workflows (tidymodels), query databases from R (DuckDB, dbplyr), build reproducible pipelines (targets), or parallelize computations (crew/mirai). Triggers on R, tidyverse, dplyr, ggplot2, targets, tidymodels, DuckDB, time series forecasting, or statistical modeling requests.",
       "core": false,
-      "tags": [],
+      "tags": [
+        "r",
+        "data-science"
+      ],
       "triggers": {}
     },
     {
@@ -564,7 +571,11 @@
       "name": "rlang-conditions",
       "description": ">",
       "core": false,
-      "tags": [],
+      "tags": [
+        "r",
+        "rlang",
+        "error-handling"
+      ],
       "triggers": {}
     },
     {
@@ -573,7 +584,10 @@
       "name": "rust-async-patterns",
       "description": "Master Rust async programming with Tokio, async traits, error handling, and concurrent patterns. Use when building async Rust applications, implementing concurrent systems, or debugging async code.",
       "core": false,
-      "tags": [],
+      "tags": [
+        "rust",
+        "async"
+      ],
       "triggers": {}
     },
     {
@@ -658,7 +672,7 @@
       "type": "skill",
       "name": "solve-issue",
       "description": "\"Solve a GitHub issue end-to-end: plan, implement (TDD), review, open PR. Uses subagents for each phase.\"",
-      "core": true,
+      "core": false,
       "tags": [
         "github",
         "issues",
