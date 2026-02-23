@@ -40,6 +40,18 @@ _check_library() {
   fi
 }
 
+_check_session() {
+  if [[ -z "${LLM_SKILLS_SESSION:-}" ]]; then
+    echo -e "${RED}Error: No active skill session.${NC}" >&2
+    echo -e "${DIM}Launch via claude/copilot/opencode wrapper to start a session.${NC}" >&2
+    exit 1
+  fi
+  if [[ ! -d "$LLM_SKILLS_SESSION" ]]; then
+    echo -e "${RED}Error: Session directory does not exist: $LLM_SKILLS_SESSION${NC}" >&2
+    exit 1
+  fi
+}
+
 _project_name() {
   basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || true
 }
@@ -153,6 +165,64 @@ _create_symlink() {
       fi
     fi
   done
+}
+
+_create_session_symlink() {
+  local id="$1"
+  local staging_dir="$2"
+
+  local type
+  type="$(_spec_type "$id")"
+  local subdir
+  subdir="$(_type_subdir "$type")"
+  local source_path
+  source_path="$(_spec_source_path "$id")"
+
+  if [[ ! -e "$source_path" ]]; then
+    return 1
+  fi
+
+  for tool_dir in "${GLOBAL_TOOL_DIRS[@]}"; do
+    local tool_name
+    tool_name="$(basename "$tool_dir")"
+    local target_dir="$staging_dir/$tool_name/$subdir"
+    mkdir -p "$target_dir"
+
+    if [[ "$type" == "skill" ]]; then
+      ln -sfn "$source_path" "$target_dir/$id"
+    else
+      ln -sf "$source_path" "$target_dir/${id}.md"
+    fi
+  done
+}
+
+_remove_session_symlink() {
+  local id="$1"
+  local staging_dir="$2"
+  local found=false
+
+  for tool_dir in "${GLOBAL_TOOL_DIRS[@]}"; do
+    local tool_name
+    tool_name="$(basename "$tool_dir")"
+
+    # Check skills subdir (directory symlink)
+    local skill_link="$staging_dir/$tool_name/skills/$id"
+    if [[ -L "$skill_link" ]]; then
+      rm -f "$skill_link"
+      found=true
+    fi
+
+    # Check agents subdir (file symlink)
+    local agent_link="$staging_dir/$tool_name/agents/${id}.md"
+    if [[ -L "$agent_link" ]]; then
+      rm -f "$agent_link"
+      found=true
+    fi
+  done
+
+  if [[ "$found" == false ]]; then
+    return 1
+  fi
 }
 
 _copy_spec_to_project() {
@@ -854,6 +924,148 @@ cmd_clean() {
   fi
 }
 
+cmd_load() {
+  _check_deps
+  _check_library
+  _check_session
+
+  local ids=()
+  while [[ $# -gt 0 ]]; do
+    ids+=("$1"); shift
+  done
+
+  if [[ ${#ids[@]} -eq 0 ]]; then
+    echo -e "${RED}Usage: specs-sync load <spec-id> [spec-id...]${NC}" >&2
+    exit 1
+  fi
+
+  local failures=0
+
+  for id in "${ids[@]}"; do
+    if ! _spec_exists "$id"; then
+      echo -e "${RED}Not found: $id${NC}" >&2
+      ((failures++)) || true
+      continue
+    fi
+
+    if ! _create_session_symlink "$id" "$LLM_SKILLS_SESSION"; then
+      echo -e "${RED}Failed to load: $id (source not found on disk)${NC}" >&2
+      ((failures++)) || true
+      continue
+    fi
+
+    local type
+    type="$(_spec_type "$id")"
+    echo -e "${GREEN}Loaded: $id${NC} ${DIM}($type)${NC}"
+  done
+
+  if [[ "$failures" -gt 0 ]]; then
+    return 1
+  fi
+}
+
+cmd_unload() {
+  _check_session
+
+  local ids=()
+  while [[ $# -gt 0 ]]; do
+    ids+=("$1"); shift
+  done
+
+  if [[ ${#ids[@]} -eq 0 ]]; then
+    echo -e "${RED}Usage: specs-sync unload <spec-id> [spec-id...]${NC}" >&2
+    exit 1
+  fi
+
+  for id in "${ids[@]}"; do
+    if ! _remove_session_symlink "$id" "$LLM_SKILLS_SESSION"; then
+      echo -e "${YELLOW}Not loaded: $id${NC}" >&2
+      continue
+    fi
+
+    echo -e "${GREEN}Unloaded: $id${NC}"
+  done
+}
+
+cmd_loaded() {
+  _check_deps
+  _check_library
+  _check_session
+
+  local staging="$LLM_SKILLS_SESSION"
+  local session_name
+  session_name="$(basename "$staging")"
+
+  # Build associative array of manifest IDs for provenance lookup
+  local -A manifest_set
+  local project_root
+  project_root="$(_project_root)"
+  local manifest="${project_root:+$project_root/.agents/specs-sync.json}"
+
+  if [[ -n "$manifest" && -f "$manifest" ]]; then
+    local id
+    while IFS= read -r id; do
+      [[ -z "$id" ]] && continue
+      manifest_set["$id"]=1
+    done < <(jq -r '.skills[]?' "$manifest" 2>/dev/null)
+    while IFS= read -r id; do
+      [[ -z "$id" ]] && continue
+      manifest_set["$id"]=1
+    done < <(jq -r '.agents[]?' "$manifest" 2>/dev/null)
+  fi
+
+  # Scan staging dir for active specs (use first tool dir as representative)
+  local session_lines=()
+  local first_tool
+  first_tool="$(basename "${GLOBAL_TOOL_DIRS[0]}")"
+
+  for subdir in "${SPEC_SUBDIRS[@]}"; do
+    local scan_dir="$staging/$first_tool/$subdir"
+    [[ -d "$scan_dir" ]] || continue
+
+    if [[ "$subdir" == "skills" ]]; then
+      for entry in "$scan_dir"/*/; do
+        [[ -L "${entry%/}" ]] || continue
+        local id
+        id="$(basename "$entry")"
+        local provenance="loaded"
+        if [[ -n "${manifest_set[$id]+x}" ]]; then
+          provenance="manifest"
+        fi
+        session_lines+=("$(printf "  ${GREEN}%-2s${NC} %-30s ${DIM}[%s]${NC}" "+" "$id" "$provenance")")
+      done
+    elif [[ "$subdir" == "agents" ]]; then
+      for entry in "$scan_dir"/*.md; do
+        [[ -L "$entry" ]] || continue
+        local id
+        id="$(basename "$entry" .md)"
+        local provenance="loaded"
+        if [[ -n "${manifest_set[$id]+x}" ]]; then
+          provenance="manifest"
+        fi
+        session_lines+=("$(printf "  ${GREEN}%-2s${NC} %-30s ${DIM}[%s]${NC}" "+" "$id" "$provenance")")
+      done
+    fi
+  done
+
+  # Print session specs
+  echo -e "${BOLD}Active specs${NC} ${DIM}(session $session_name):${NC}"
+  if [[ ${#session_lines[@]} -gt 0 ]]; then
+    for line in "${session_lines[@]}"; do
+      echo -e "$line"
+    done
+  else
+    echo -e "  ${DIM}(none)${NC}"
+  fi
+  echo ""
+
+  # Print core globals
+  echo -e "${BOLD}Core specs${NC} ${DIM}(global):${NC}"
+  while IFS= read -r id; do
+    printf "  ${GREEN}%-2s${NC} %s\n" "+" "$id"
+  done < <(_get_core_ids)
+}
+
 cmd_generate_library() {
   _check_deps
 
@@ -991,6 +1203,9 @@ main() {
     init)       shift; cmd_init "$@" ;;
     clean)      shift; cmd_clean "$@" ;;
     generate-library) shift; cmd_generate_library "$@" ;;
+    load)       shift; cmd_load "$@" ;;
+    unload)     shift; cmd_unload "$@" ;;
+    loaded)     shift; cmd_loaded "$@" ;;
     help|--help|-h) cmd_help ;;
     *)
       echo -e "${RED}Unknown subcommand: $subcommand${NC}" >&2
