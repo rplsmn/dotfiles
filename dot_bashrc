@@ -57,24 +57,138 @@ _artifact_commit_and_push() {
   fi
 }
 
-# --- Tool wrappers ---
+# --- Tool helpers ---
 
 _in_git_repo() {
   git rev-parse --is-inside-work-tree &>/dev/null
 }
 
+_project_root() {
+  git rev-parse --show-toplevel 2>/dev/null || true
+}
+
+# --- Session lifecycle ---
+
+# Create symlinks for a spec in the session staging directory.
+# Skills = directory symlinks, Agents = file symlinks.
+_create_session_symlink() {
+  local id="$1"
+  local staging="$2"
+  local library_dir="${XDG_DATA_HOME:-$HOME/.local/share}/llm-specs"
+  local library_json="$library_dir/library.json"
+
+  if [[ ! -f "$library_json" ]]; then
+    echo "Warning: library.json not found at $library_json" >&2
+    return 1
+  fi
+
+  local type
+  type="$(jq -r --arg id "$id" '.specs[] | select(.id == $id) | .type' "$library_json")"
+
+  if [[ -z "$type" ]]; then
+    echo "Warning: spec '$id' not found in library" >&2
+    return 1
+  fi
+
+  local subdir source_path
+  case "$type" in
+    skill)
+      subdir="skills"
+      source_path="$library_dir/skills/$id"
+      ;;
+    agent)
+      subdir="agents"
+      source_path="$library_dir/agents/${id}.md"
+      ;;
+    *)
+      echo "Warning: unknown type '$type' for spec '$id'" >&2
+      return 1
+      ;;
+  esac
+
+  if [[ ! -e "$source_path" ]]; then
+    echo "Warning: source not found for '$id' at $source_path" >&2
+    return 1
+  fi
+
+  # Symlink into each tool subdirectory within the staging dir
+  local tool_dir
+  for tool_dir in .claude .copilot .agents; do
+    local target_dir="$staging/$tool_dir/$subdir"
+    if [[ "$type" == "skill" ]]; then
+      ln -sfn "$source_path" "$target_dir/$id"
+    else
+      ln -sf "$source_path" "$target_dir/${id}.md"
+    fi
+  done
+}
+
+# Create a per-session staging directory and populate it from the project manifest.
+# Exports LLM_SKILLS_SESSION. Prints the staging dir path to stdout.
+# Returns 1 if not in a git repo (caller should skip staging).
+_llm_session_start() {
+  local project_root
+  project_root="$(_project_root)"
+  if [[ -z "$project_root" ]]; then
+    return 1
+  fi
+
+  local project_name
+  project_name="$(_artifact_repo_name)"
+  local session_id="${project_name:-anon}-$(date +%s)-$$"
+  local staging="$HOME/.cache/llm-skills/$session_id"
+
+  # Create staging directory structure for all tool dirs
+  local tool_dir
+  for tool_dir in .claude .copilot .agents; do
+    mkdir -p "$staging/$tool_dir"/{skills,agents}
+  done
+
+  # Layer 2: load specs from project manifest
+  local manifest="$project_root/.agents/specs-sync.json"
+  if [[ -f "$manifest" ]] && command -v jq &>/dev/null; then
+    local id
+    # Load skills from manifest
+    while IFS= read -r id; do
+      if [[ -n "$id" ]]; then
+        _create_session_symlink "$id" "$staging" || true
+      fi
+    done < <(jq -r '.skills // [] | .[]' "$manifest" 2>/dev/null)
+
+    # Load agents from manifest
+    while IFS= read -r id; do
+      if [[ -n "$id" ]]; then
+        _create_session_symlink "$id" "$staging" || true
+      fi
+    done < <(jq -r '.agents // [] | .[]' "$manifest" 2>/dev/null)
+  fi
+
+  export LLM_SKILLS_SESSION="$staging"
+  echo "$staging"
+}
+
+# Remove the session staging directory and unset the env var.
+_llm_session_end() {
+  if [[ -n "${LLM_SKILLS_SESSION:-}" && -d "$LLM_SKILLS_SESSION" ]]; then
+    rm -rf "$LLM_SKILLS_SESSION"
+  fi
+  unset LLM_SKILLS_SESSION
+}
+
+# --- Tool wrappers ---
+
 claude() {
   local extra_args=()
   if _in_git_repo; then
-    local artifact_dir
+    local artifact_dir staging_dir
     artifact_dir="$(_artifact_ensure_dir)" && extra_args+=(--add-dir "$artifact_dir")
-    # Refresh activated specs from cold library (never adds new ones)
-    specs-sync refresh --quiet 2>/dev/null || true
+    staging_dir="$(_llm_session_start)" && extra_args+=(--add-dir "$staging_dir")
   fi
 
   command claude "${extra_args[@]}" "$@"
   local exit_code=$?
 
+  _llm_session_end
   if _in_git_repo; then
     _artifact_commit_and_push
   fi
@@ -84,15 +198,15 @@ claude() {
 copilot() {
   local extra_args=()
   if _in_git_repo; then
-    local artifact_dir
+    local artifact_dir staging_dir
     artifact_dir="$(_artifact_ensure_dir)" && extra_args+=(--add-dir "$artifact_dir")
-    # Refresh activated specs from cold library (never adds new ones)
-    specs-sync refresh --quiet 2>/dev/null || true
+    staging_dir="$(_llm_session_start)" && extra_args+=(--add-dir "$staging_dir")
   fi
 
   command copilot "${extra_args[@]}" "$@"
   local exit_code=$?
 
+  _llm_session_end
   if _in_git_repo; then
     _artifact_commit_and_push
   fi
@@ -102,13 +216,15 @@ copilot() {
 opencode() {
   local extra_args=()
   if _in_git_repo; then
-    local artifact_dir
+    local artifact_dir staging_dir
     artifact_dir="$(_artifact_ensure_dir)" && extra_args+=(--add-dir "$artifact_dir")
+    staging_dir="$(_llm_session_start)" && extra_args+=(--add-dir "$staging_dir")
   fi
 
   command opencode "${extra_args[@]}" "$@"
   local exit_code=$?
 
+  _llm_session_end
   if _in_git_repo; then
     _artifact_commit_and_push
   fi
