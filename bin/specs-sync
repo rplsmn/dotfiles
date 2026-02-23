@@ -87,6 +87,37 @@ _spec_source_path() {
   fi
 }
 
+_manifest_path() {
+  local project_root
+  project_root="$(_project_root)"
+  if [[ -z "$project_root" ]]; then
+    return 1
+  fi
+  echo "$project_root/.agents/specs-sync.json"
+}
+
+_ensure_manifest() {
+  local manifest
+  manifest="$(_manifest_path)" || return 1
+  local manifest_dir
+  manifest_dir="$(dirname "$manifest")"
+  mkdir -p "$manifest_dir"
+  if [[ ! -f "$manifest" ]]; then
+    echo '{"skills":[],"agents":[]}' > "$manifest"
+  fi
+}
+
+_read_manifest_ids() {
+  local manifest="$1"
+  local type="$2"  # "skill" or "agent"
+  local key
+  case "$type" in
+    skill) key="skills" ;;
+    agent) key="agents" ;;
+  esac
+  jq -r ".${key}[]" "$manifest" 2>/dev/null
+}
+
 _create_symlink() {
   local id="$1"
   local type
@@ -170,12 +201,21 @@ Usage: specs-sync <subcommand> [options] [arguments]
 Machine sync (global dirs — core specs via symlinks):
   sync            Rebuild core spec symlinks in global dirs
   clean           Remove non-symlinks from global dirs (stale copies)
-  status          Show core specs and project-local specs (default)
+  status          Show core, session, manifest, and available specs (default)
 
-Project (local dirs — copies):
-  init            Initialize project directory structure
-  add <id>        Copy a spec from cold library into the project
-  refresh         Update project specs from cold library; auto-commit if changed
+Project manifest (declares which specs a project needs):
+  init            Initialize project dirs and manifest stub
+  add <id>        Add spec ID(s) to project manifest (.agents/specs-sync.json)
+  remove <id>     Remove spec ID(s) from project manifest
+
+Session (active LLM session — staging dir):
+  load <id>       Symlink spec into active staging dir (JIT loading)
+  unload <id>     Remove spec from active staging dir
+  loaded          Show specs loaded in active session
+  refresh         Re-read manifest and refresh staging dir symlinks
+
+Migration:
+  migrate         Convert legacy spec copies to manifest-based loading
 
 Discovery:
   list            List all specs in the library
@@ -193,10 +233,13 @@ Global tool dirs: ~/.claude, ~/.copilot, ~/.agents, ~/.vibe
 
 Examples:
   specs-sync sync                    # rebuild global core symlinks
-  specs-sync clean                   # remove stale non-symlink copies
-  specs-sync init                    # initialize project directories
-  specs-sync add tdd                 # copy a spec into the project
-  specs-sync refresh                 # refresh project specs from cold library
+  specs-sync init                    # initialize project dirs + manifest
+  specs-sync add vitest tdd          # add specs to project manifest
+  specs-sync remove vitest           # remove spec from project manifest
+  specs-sync load debugging          # load spec into active session
+  specs-sync unload debugging        # unload spec from active session
+  specs-sync loaded                  # show active session specs
+  specs-sync refresh                 # refresh staging dir from manifest
   specs-sync list --type skill       # list all skills
   specs-sync generate-library        # regenerate library.json from disk
 EOF
@@ -229,8 +272,90 @@ cmd_status() {
   done < <(_get_core_ids)
   echo ""
 
-  # Project-local specs (detected from .claude/skills/ and .claude/agents/)
+  # Session-loaded specs (staging dir)
+  local staging="${LLM_SKILLS_SESSION:-}"
+  if [[ -n "$staging" && -d "$staging" ]]; then
+    local session_lines=()
+    for tool_subdir in .claude; do
+      for subdir in "${SPEC_SUBDIRS[@]}"; do
+        local dir="$staging/$tool_subdir/$subdir"
+        [[ -d "$dir" ]] || continue
+
+        if [[ "$subdir" == "skills" ]]; then
+          for entry in "$dir"/*/; do
+            [[ -d "$entry" ]] || continue
+            local id
+            id="$(basename "$entry")"
+            session_lines+=("$(printf "  ${GREEN}✓${NC} "; _format_type "skill"; printf "  %s" "$id")")
+          done
+        elif [[ "$subdir" == "agents" ]]; then
+          for entry in "$dir"/*.md; do
+            [[ -f "$entry" ]] || continue
+            local id
+            id="$(basename "$entry" .md)"
+            session_lines+=("$(printf "  ${GREEN}✓${NC} "; _format_type "agent"; printf "  %s" "$id")")
+          done
+        fi
+      done
+    done
+
+    if [[ ${#session_lines[@]} -gt 0 ]]; then
+      echo -e "${BOLD}Session specs (staging dir):${NC}"
+      for line in "${session_lines[@]}"; do
+        echo -e "$line"
+      done
+      echo ""
+    else
+      echo -e "${BOLD}Session specs (staging dir):${NC}"
+      echo -e "  ${DIM}(none loaded)${NC}"
+      echo ""
+    fi
+  fi
+
+  # Collect manifest IDs for exclusion from "Cold (available)"
+  local -A manifest_ids_set
+  local manifest=""
+
+  # Manifest specs (project)
   if [[ -n "$project_root" ]]; then
+    manifest="$(_manifest_path)" || true
+    if [[ -n "$manifest" && -f "$manifest" ]]; then
+      local manifest_lines=()
+
+      while IFS= read -r id; do
+        [[ -z "$id" ]] && continue
+        manifest_ids_set["$id"]=1
+        if _spec_exists "$id"; then
+          manifest_lines+=("$(printf "  ${GREEN}✓${NC} "; _format_type "skill"; printf "  %s" "$id")")
+        else
+          manifest_lines+=("$(printf "  ${YELLOW}?${NC} skill   %s ${DIM}(not in library)${NC}" "$id")")
+        fi
+      done < <(_read_manifest_ids "$manifest" "skill")
+
+      while IFS= read -r id; do
+        [[ -z "$id" ]] && continue
+        manifest_ids_set["$id"]=1
+        if _spec_exists "$id"; then
+          manifest_lines+=("$(printf "  ${GREEN}✓${NC} "; _format_type "agent"; printf "  %s" "$id")")
+        else
+          manifest_lines+=("$(printf "  ${YELLOW}?${NC} agent   %s ${DIM}(not in library)${NC}" "$id")")
+        fi
+      done < <(_read_manifest_ids "$manifest" "agent")
+
+      if [[ ${#manifest_lines[@]} -gt 0 ]]; then
+        echo -e "${BOLD}Manifest specs (.agents/specs-sync.json):${NC}"
+        for line in "${manifest_lines[@]}"; do
+          echo -e "$line"
+        done
+        echo ""
+      else
+        echo -e "${BOLD}Manifest specs (.agents/specs-sync.json):${NC}"
+        echo -e "  ${DIM}(empty manifest)${NC}"
+        echo ""
+      fi
+    fi
+
+    # Legacy project-local specs (detected from .claude/skills/ and .claude/agents/)
     local local_lines=()
 
     for subdir in "${SPEC_SUBDIRS[@]}"; do
@@ -240,49 +365,58 @@ cmd_status() {
       if [[ "$subdir" == "skills" ]]; then
         for entry in "$dir"/*/; do
           [[ -d "$entry" ]] || continue
+          [[ -L "$entry" ]] && continue  # skip symlinks (those are core)
           local id
           id="$(basename "$entry")"
           if _spec_exists "$id"; then
-            local_lines+=("$(printf "  ${GREEN}✓${NC} "; _format_type "skill"; printf "  %s" "$id")")
+            local_lines+=("$(printf "  ${YELLOW}!${NC} "; _format_type "skill"; printf "  %s ${DIM}(legacy copy)${NC}" "$id")")
           else
-            local_lines+=("$(printf "  ${YELLOW}?${NC} skill   %s ${DIM}(not in library)${NC}" "$id")")
+            local_lines+=("$(printf "  ${YELLOW}?${NC} skill   %s ${DIM}(not in library, legacy copy)${NC}" "$id")")
           fi
         done
       elif [[ "$subdir" == "agents" ]]; then
         for entry in "$dir"/*.md; do
           [[ -f "$entry" ]] || continue
+          [[ -L "$entry" ]] && continue  # skip symlinks
           local id
           id="$(basename "$entry" .md)"
           if _spec_exists "$id"; then
-            local_lines+=("$(printf "  ${GREEN}✓${NC} "; _format_type "agent"; printf "  %s" "$id")")
+            local_lines+=("$(printf "  ${YELLOW}!${NC} "; _format_type "agent"; printf "  %s ${DIM}(legacy copy)${NC}" "$id")")
           else
-            local_lines+=("$(printf "  ${YELLOW}?${NC} agent   %s ${DIM}(not in library)${NC}" "$id")")
+            local_lines+=("$(printf "  ${YELLOW}?${NC} agent   %s ${DIM}(not in library, legacy copy)${NC}" "$id")")
           fi
         done
       fi
     done
 
     if [[ ${#local_lines[@]} -gt 0 ]]; then
-      echo -e "${BOLD}Project-local specs:${NC}"
+      echo -e "${BOLD}Legacy project-local specs:${NC}"
       for line in "${local_lines[@]}"; do
         echo -e "$line"
       done
+      echo -e "  ${DIM}Run 'specs-sync migrate' to convert to manifest-based loading${NC}"
       echo ""
     fi
   fi
 
-  # Cold (not core, not in project)
+  # Cold (not core, not in manifest)
   echo -e "${BOLD}Cold (available):${NC}"
   local core_ids
   core_ids="$(_get_core_ids)"
   while IFS= read -r id; do
-    if ! echo "$core_ids" | grep -qx "$id"; then
-      local type
-      type="$(_spec_type "$id")"
-      printf "  ${DIM}○${NC} "
-      _format_type "$type"
-      printf "  %s\n" "$id"
+    # Skip if core
+    if echo "$core_ids" | grep -qx "$id"; then
+      continue
     fi
+    # Skip if in manifest
+    if [[ -n "${manifest_ids_set[$id]+x}" ]]; then
+      continue
+    fi
+    local type
+    type="$(_spec_type "$id")"
+    printf "  ${DIM}○${NC} "
+    _format_type "$type"
+    printf "  %s\n" "$id"
   done < <(_get_all_ids)
 }
 
@@ -371,16 +505,98 @@ cmd_add() {
     exit 1
   fi
 
+  local manifest
+  manifest="$(_manifest_path)"
+  _ensure_manifest
+
   for id in "${ids[@]}"; do
     if ! _spec_exists "$id"; then
-      echo -e "${RED}✗ Not found: $id${NC}" >&2
+      echo -e "${RED}✗ Not found in library: $id${NC}" >&2
       continue
     fi
 
     local type
     type="$(_spec_type "$id")"
-    _copy_spec_to_project "$id" "$project_root"
-    echo -e "${GREEN}✓ Added: $id ($type)${NC}"
+    local key
+    case "$type" in
+      skill) key="skills" ;;
+      agent) key="agents" ;;
+    esac
+
+    # Idempotent: add to array only if not already present, then unique
+    jq --arg id "$id" --arg key "$key" '.[$key] |= (. + [$id] | unique)' "$manifest" > "$manifest.tmp"
+    mv "$manifest.tmp" "$manifest"
+
+    echo -e "${GREEN}✓ Added to manifest: $id ($type)${NC}"
+  done
+}
+
+cmd_remove() {
+  _check_deps
+  _check_library
+
+  local ids=()
+  while [[ $# -gt 0 ]]; do
+    ids+=("$1"); shift
+  done
+
+  if [[ ${#ids[@]} -eq 0 ]]; then
+    echo -e "${RED}Usage: specs-sync remove <spec-id> [spec-id...]${NC}" >&2
+    exit 1
+  fi
+
+  local project_root
+  project_root="$(_project_root)"
+  if [[ -z "$project_root" ]]; then
+    echo -e "${RED}Error: Not in a git repository.${NC}" >&2
+    exit 1
+  fi
+
+  local manifest
+  manifest="$(_manifest_path)"
+  if [[ ! -f "$manifest" ]]; then
+    echo -e "${YELLOW}Warning: No manifest found at $manifest${NC}" >&2
+    return 0
+  fi
+
+  for id in "${ids[@]}"; do
+    # Determine type to know which array to remove from
+    local type key
+    if _spec_exists "$id"; then
+      type="$(_spec_type "$id")"
+      case "$type" in
+        skill) key="skills" ;;
+        agent) key="agents" ;;
+      esac
+    else
+      # ID not in library — try removing from both arrays
+      key=""
+    fi
+
+    if [[ -n "$key" ]]; then
+      # Check if the ID is actually in the manifest before removing
+      if jq -e --arg id "$id" --arg key "$key" '.[$key] | index($id)' "$manifest" &>/dev/null; then
+        jq --arg id "$id" --arg key "$key" '.[$key] |= map(select(. != $id))' "$manifest" > "$manifest.tmp"
+        mv "$manifest.tmp" "$manifest"
+        echo -e "${GREEN}✓ Removed from manifest: $id ($type)${NC}"
+      else
+        echo -e "${YELLOW}Warning: $id not found in manifest ${key} array${NC}" >&2
+      fi
+    else
+      # Unknown type — try removing from both arrays
+      local found=false
+      for try_key in skills agents; do
+        if jq -e --arg id "$id" --arg key "$try_key" '.[$key] | index($id)' "$manifest" &>/dev/null; then
+          jq --arg id "$id" --arg key "$try_key" '.[$key] |= map(select(. != $id))' "$manifest" > "$manifest.tmp"
+          mv "$manifest.tmp" "$manifest"
+          echo -e "${GREEN}✓ Removed from manifest: $id (from $try_key)${NC}"
+          found=true
+        fi
+      done
+      if [[ "$found" == false ]]; then
+        echo -e "${YELLOW}Warning: $id not found in manifest${NC}" >&2
+      fi
+    fi
   done
 }
 
@@ -402,67 +618,91 @@ cmd_refresh() {
     return 0
   fi
 
-  # Scan project dirs for specs that match library IDs and update them
-  local refreshed=0
-  for subdir in "${SPEC_SUBDIRS[@]}"; do
-    local dir="$project_root/.claude/$subdir"
-    [[ -d "$dir" ]] || continue
+  # Legacy detection: warn if old-style copies exist without manifest
+  local manifest
+  manifest="$(_manifest_path)"
+  local has_legacy=false
+  if [[ ! -f "$manifest" ]]; then
+    for subdir in "${SPEC_SUBDIRS[@]}"; do
+      local dir="$project_root/.claude/$subdir"
+      [[ -d "$dir" ]] || continue
+      for entry in "$dir"/*; do
+        [[ -e "$entry" ]] || continue
+        if [[ ! -L "$entry" ]]; then
+          has_legacy=true
+          break 2
+        fi
+      done
+    done
+  fi
 
-    if [[ "$subdir" == "skills" ]]; then
-      for entry in "$dir"/*/; do
-        [[ -d "$entry" ]] || continue
-        local id
-        id="$(basename "$entry")"
-        if _spec_exists "$id"; then
-          _copy_spec_to_project "$id" "$project_root"
-          ((refreshed++)) || true
-        fi
-      done
-    elif [[ "$subdir" == "agents" ]]; then
-      for entry in "$dir"/*.md; do
-        [[ -f "$entry" ]] || continue
-        local id
-        id="$(basename "$entry" .md)"
-        if _spec_exists "$id"; then
-          _copy_spec_to_project "$id" "$project_root"
-          ((refreshed++)) || true
-        fi
-      done
+  if [[ "$has_legacy" == true && "$quiet" == false ]]; then
+    echo -e "${YELLOW}Warning: Legacy spec copies detected in .claude/ without a manifest.${NC}" >&2
+    echo -e "${YELLOW}Run 'specs-sync migrate' to switch to manifest-based loading.${NC}" >&2
+  fi
+
+  # Session mode: re-read manifest and refresh staging dir symlinks
+  local staging="${LLM_SKILLS_SESSION:-}"
+  if [[ -z "$staging" ]]; then
+    if [[ "$quiet" == false && "$has_legacy" == false ]]; then
+      echo -e "${DIM}No active session. Nothing to refresh.${NC}"
     fi
-  done
-
-  if [[ "$refreshed" -eq 0 ]]; then
     return 0
   fi
 
-  # Collect spec directories that exist in the project
-  local spec_paths=()
-  for subdir in "${SPEC_SUBDIRS[@]}"; do
-    [[ -d "$project_root/.claude/$subdir" ]] && spec_paths+=(".claude/$subdir")
-    [[ -d "$project_root/.github/$subdir" ]] && spec_paths+=(".github/$subdir")
-  done
-
-  if [[ ${#spec_paths[@]} -eq 0 ]]; then
-    return 0
-  fi
-
-  # Check for actual content changes and new files
-  local has_changes=false
-  if ! git -C "$project_root" diff --quiet -- "${spec_paths[@]}" 2>/dev/null; then
-    has_changes=true
-  fi
-  if [[ -n "$(git -C "$project_root" ls-files --others --exclude-standard -- "${spec_paths[@]}" 2>/dev/null)" ]]; then
-    has_changes=true
-  fi
-
-  if [[ "$has_changes" == true ]]; then
-    git -C "$project_root" add -- "${spec_paths[@]}"
-    git -C "$project_root" commit -m "chore: refresh specs from cold library" --quiet
+  if [[ ! -f "$manifest" ]]; then
     if [[ "$quiet" == false ]]; then
-      echo -e "${GREEN}✓ Refreshed $refreshed specs from cold library (committed)${NC}"
+      echo -e "${DIM}No manifest found. Nothing to refresh.${NC}"
     fi
-  elif [[ "$quiet" == false ]]; then
-    echo -e "${DIM}All $refreshed specs already up to date${NC}"
+    return 0
+  fi
+
+  local refreshed=0
+
+  for spec_type in skill agent; do
+    while IFS= read -r id; do
+      [[ -z "$id" ]] && continue
+      if ! _spec_exists "$id"; then
+        if [[ "$quiet" == false ]]; then
+          echo -e "${YELLOW}Warning: $id not found in library, skipping${NC}" >&2
+        fi
+        continue
+      fi
+
+      local type
+      type="$(_spec_type "$id")"
+      local subdir
+      subdir="$(_type_subdir "$type")"
+      local source_path
+      source_path="$(_spec_source_path "$id")"
+
+      if [[ ! -e "$source_path" ]]; then
+        if [[ "$quiet" == false ]]; then
+          echo -e "${YELLOW}Warning: source not found for $id, skipping${NC}" >&2
+        fi
+        continue
+      fi
+
+      # Symlink into staging dir tool subdirs
+      for tool_subdir in .claude .copilot .agents .vibe; do
+        local target_dir="$staging/$tool_subdir/$subdir"
+        mkdir -p "$target_dir"
+        if [[ "$type" == "skill" ]]; then
+          ln -sfn "$source_path" "$target_dir/$id"
+        else
+          ln -sf "$source_path" "$target_dir/${id}.md"
+        fi
+      done
+      ((refreshed++)) || true
+    done < <(_read_manifest_ids "$manifest" "$spec_type")
+  done
+
+  if [[ "$quiet" == false ]]; then
+    if [[ "$refreshed" -gt 0 ]]; then
+      echo -e "${GREEN}✓ Refreshed $refreshed specs in staging dir${NC}"
+    else
+      echo -e "${DIM}Manifest is empty. Nothing to refresh.${NC}"
+    fi
   fi
 }
 
@@ -530,8 +770,8 @@ cmd_init() {
   echo -e "${BOLD}Initializing project:${NC} $project_root"
 
   if [[ "$dry_run" == true ]]; then
-    echo -e "${DIM}Would create .claude/ and .github/ directories${NC}"
-    echo -e "${DIM}Would create AGENTS.md and CLAUDE.md if missing${NC}"
+    echo -e "${DIM}Would create .claude/, .github/, and .agents/ directories${NC}"
+    echo -e "${DIM}Would create AGENTS.md, CLAUDE.md, and .agents/specs-sync.json if missing${NC}"
     return 0
   fi
 
@@ -540,6 +780,15 @@ cmd_init() {
     mkdir -p "$pdir"/{skills,agents}
   done
   echo -e "${GREEN}✓ Created .claude/ and .github/ directories${NC}"
+
+  # Create .agents/ directory and manifest stub
+  mkdir -p "$project_root/.agents"
+  if [[ ! -f "$project_root/.agents/specs-sync.json" ]]; then
+    echo '{"skills":[],"agents":[]}' > "$project_root/.agents/specs-sync.json"
+    echo -e "${GREEN}✓ Created .agents/specs-sync.json manifest${NC}"
+  else
+    echo -e "${DIM}  .agents/specs-sync.json already exists${NC}"
+  fi
 
   # Create AGENTS.md if missing
   if [[ ! -f "$project_root/AGENTS.md" ]]; then
@@ -557,7 +806,7 @@ cmd_init() {
     echo -e "${DIM}  CLAUDE.md already exists${NC}"
   fi
 
-  echo -e "\n${DIM}Use 'specs-sync add <id>' to add specs to this project.${NC}"
+  echo -e "\n${DIM}Use 'specs-sync add <id>' to add specs to this project manifest.${NC}"
 }
 
 cmd_clean() {
@@ -736,6 +985,7 @@ main() {
     list)       shift; cmd_list "$@" ;;
     search)     shift; cmd_search "$@" ;;
     add)        shift; cmd_add "$@" ;;
+    remove)     shift; cmd_remove "$@" ;;
     refresh)    shift; cmd_refresh "$@" ;;
     sync)       shift; cmd_sync "$@" ;;
     init)       shift; cmd_init "$@" ;;
