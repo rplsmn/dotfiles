@@ -52,6 +52,7 @@ Bash CLI (`set -euo pipefail`). Key subcommands:
 - `init` — Create project directory structure
 - `list [--tag TAG] [--type TYPE]` / `search <query>` — Discovery
 - `generate-library` — Regenerate `library.json` from disk contents (preserves existing metadata)
+- `publish <id> [--dry-run] [--force]` — Publish a project-local spec to the source repo as a PR
 
 ### Shell Wrappers (`dot_bashrc`)
 
