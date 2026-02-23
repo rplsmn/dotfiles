@@ -60,6 +60,14 @@ chmod +x "$HOME/.local/bin/machine-sync"
 cp "$REPO/bin/specs-sync" "$HOME/.local/bin/specs-sync"
 chmod +x "$HOME/.local/bin/specs-sync"
 
+# --- Config file (persistent repo path for specs-sync publish, etc.) ---
+echo "==> Writing specs config"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/llm-specs"
+mkdir -p "$CONFIG_DIR"
+cat > "$CONFIG_DIR/config" <<EOF
+REPO="$REPO"
+EOF
+
 # --- Artifacts repo ---
 echo "==> Syncing artifacts"
 artifact-sync
