@@ -164,7 +164,6 @@ _llm_session_start() {
   fi
 
   export LLM_SKILLS_SESSION="$staging"
-  echo "$staging"
 }
 
 # Remove the session staging directory and unset the env var.
@@ -180,9 +179,9 @@ _llm_session_end() {
 claude() {
   local extra_args=()
   if _in_git_repo; then
-    local artifact_dir staging_dir
+    local artifact_dir
     artifact_dir="$(_artifact_ensure_dir)" && extra_args+=(--add-dir "$artifact_dir")
-    staging_dir="$(_llm_session_start)" && extra_args+=(--add-dir "$staging_dir")
+    _llm_session_start && extra_args+=(--add-dir "$LLM_SKILLS_SESSION")
   fi
 
   command claude "${extra_args[@]}" "$@"
@@ -198,9 +197,9 @@ claude() {
 copilot() {
   local extra_args=()
   if _in_git_repo; then
-    local artifact_dir staging_dir
+    local artifact_dir
     artifact_dir="$(_artifact_ensure_dir)" && extra_args+=(--add-dir "$artifact_dir")
-    staging_dir="$(_llm_session_start)" && extra_args+=(--add-dir "$staging_dir")
+    _llm_session_start && extra_args+=(--add-dir "$LLM_SKILLS_SESSION")
   fi
 
   command copilot "${extra_args[@]}" "$@"
@@ -216,9 +215,9 @@ copilot() {
 opencode() {
   local extra_args=()
   if _in_git_repo; then
-    local artifact_dir staging_dir
+    local artifact_dir
     artifact_dir="$(_artifact_ensure_dir)" && extra_args+=(--add-dir "$artifact_dir")
-    staging_dir="$(_llm_session_start)" && extra_args+=(--add-dir "$staging_dir")
+    _llm_session_start && extra_args+=(--add-dir "$LLM_SKILLS_SESSION")
   fi
 
   command opencode "${extra_args[@]}" "$@"
