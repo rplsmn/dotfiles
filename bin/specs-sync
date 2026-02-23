@@ -271,6 +271,7 @@ Usage: specs-sync <subcommand> [options] [arguments]
 Machine sync (global dirs — core specs via symlinks):
   sync            Rebuild core spec symlinks in global dirs
   clean           Remove non-symlinks from global dirs (stale copies)
+    --project        Clean project .claude/ dir instead (only removes library-known specs)
   status          Show core, session, manifest, and available specs (default)
 
 Project manifest (declares which specs a project needs):
@@ -882,14 +883,24 @@ cmd_init() {
 cmd_clean() {
   _check_deps
 
-  local dry_run=false
+  local dry_run=false project=false
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --dry-run) dry_run=true; shift ;;
+      --project) project=true; shift ;;
       *)         shift ;;
     esac
   done
 
+  if [[ "$project" == true ]]; then
+    _clean_project "$dry_run"
+  else
+    _clean_global "$dry_run"
+  fi
+}
+
+_clean_global() {
+  local dry_run="$1"
   local removed=0
 
   for tool_dir in "${GLOBAL_TOOL_DIRS[@]}"; do
@@ -921,6 +932,69 @@ cmd_clean() {
     echo -e "\n${DIM}$removed items would be removed. Run without --dry-run to proceed.${NC}"
   else
     echo -e "\n${GREEN}✓ Cleaned $removed non-symlink entries from global dirs${NC}"
+  fi
+}
+
+_clean_project() {
+  _check_library
+  local dry_run="$1"
+
+  local project_root
+  project_root="$(_project_root)"
+  if [[ -z "$project_root" ]]; then
+    echo -e "${RED}Error: Not in a git repository.${NC}" >&2
+    exit 1
+  fi
+
+  local removed=0
+  local unknown=()
+
+  for subdir in "${SPEC_SUBDIRS[@]}"; do
+    local dir="$project_root/.claude/$subdir"
+    [[ -d "$dir" ]] || continue
+
+    for entry in "$dir"/*; do
+      [[ -e "$entry" ]] || continue
+      [[ -L "$entry" ]] && continue  # skip symlinks (core specs)
+
+      local name
+      name="$(basename "$entry")"
+      # Strip .md extension for agents to get the ID
+      local id="$name"
+      if [[ "$subdir" == "agents" ]]; then
+        id="${name%.md}"
+      fi
+
+      if _spec_exists "$id"; then
+        # In library — safe to remove
+        if [[ "$dry_run" == true ]]; then
+          echo -e "${DIM}Would remove: .claude/$subdir/$name${NC}"
+        else
+          rm -rf "$entry"
+          echo -e "  ${GREEN}✓${NC} Removed .claude/$subdir/$name"
+        fi
+        ((removed++)) || true
+      else
+        # Not in library — leave alone, warn
+        unknown+=(".claude/$subdir/$name")
+      fi
+    done
+  done
+
+  if [[ "$removed" -eq 0 && ${#unknown[@]} -eq 0 ]]; then
+    echo -e "${DIM}Nothing to clean in project${NC}"
+  elif [[ "$dry_run" == true && "$removed" -gt 0 ]]; then
+    echo -e "\n${DIM}$removed items would be removed. Run without --dry-run to proceed.${NC}"
+  elif [[ "$removed" -gt 0 ]]; then
+    echo -e "\n${GREEN}✓ Cleaned $removed non-symlink entries from project${NC}"
+  fi
+
+  if [[ ${#unknown[@]} -gt 0 ]]; then
+    echo ""
+    echo -e "${YELLOW}Not in library (kept):${NC}"
+    for u in "${unknown[@]}"; do
+      echo -e "  ${DIM}$u${NC}  — publish or remove manually"
+    done
   fi
 }
 
