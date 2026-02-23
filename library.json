@@ -932,6 +932,21 @@
         "standards"
       ],
       "triggers": {}
+    },
+    {
+      "id": "toto",
+      "type": "skill",
+      "name": "toto",
+      "description": "Use when asked about your name",
+      "core": false,
+      "tags": [
+        "dev",
+        "temp"
+      ],
+      "triggers": {
+        "files": [],
+        "extensions": []
+      }
     }
   ]
 }
