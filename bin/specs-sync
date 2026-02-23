@@ -1066,6 +1066,181 @@ cmd_loaded() {
   done < <(_get_core_ids)
 }
 
+cmd_migrate() {
+  _check_deps
+  _check_library
+
+  local project_root
+  project_root="$(_project_root)"
+  if [[ -z "$project_root" ]]; then
+    echo -e "${RED}Error: Not in a git repository.${NC}" >&2
+    exit 1
+  fi
+
+  echo -e "${BOLD}Migrating project to manifest-based loading...${NC}"
+  echo ""
+
+  # Scan project directories for non-symlink spec entries (legacy copies)
+  local -a added_ids=()
+  local -a skipped_ids=()
+  local -a scan_dirs=("$project_root/.claude" "$project_root/.github")
+
+  for pdir in "${scan_dirs[@]}"; do
+    # Scan skills (directories)
+    local skills_dir="$pdir/skills"
+    if [[ -d "$skills_dir" ]]; then
+      for entry in "$skills_dir"/*/; do
+        [[ -d "$entry" ]] || continue
+        # Skip symlinks — those are core specs managed by specs-sync sync
+        [[ -L "${entry%/}" ]] && continue
+
+        local id
+        id="$(basename "$entry")"
+
+        # Skip if already collected (avoids duplicates across .claude and .github)
+        local already=false
+        for aid in "${added_ids[@]}" "${skipped_ids[@]}"; do
+          if [[ "$aid" == "$id" ]]; then
+            already=true
+            break
+          fi
+        done
+        [[ "$already" == true ]] && continue
+
+        # Verify spec exists in cold library
+        if _spec_exists "$id"; then
+          added_ids+=("$id")
+        else
+          skipped_ids+=("$id")
+          echo -e "${YELLOW}Warning: Skill '$id' found locally but NOT in cold library.${NC}" >&2
+          echo -e "${YELLOW}  Move it to $LIBRARY_DIR/skills/$id first, then re-run migrate.${NC}" >&2
+        fi
+      done
+    fi
+
+    # Scan agents (.md files)
+    local agents_dir="$pdir/agents"
+    if [[ -d "$agents_dir" ]]; then
+      for entry in "$agents_dir"/*.md; do
+        [[ -f "$entry" ]] || continue
+        # Skip symlinks
+        [[ -L "$entry" ]] && continue
+
+        local id
+        id="$(basename "$entry" .md)"
+
+        # Skip if already collected
+        local already=false
+        for aid in "${added_ids[@]}" "${skipped_ids[@]}"; do
+          if [[ "$aid" == "$id" ]]; then
+            already=true
+            break
+          fi
+        done
+        [[ "$already" == true ]] && continue
+
+        # Verify spec exists in cold library
+        if _spec_exists "$id"; then
+          added_ids+=("$id")
+        else
+          skipped_ids+=("$id")
+          echo -e "${YELLOW}Warning: Agent '$id' found locally but NOT in cold library.${NC}" >&2
+          echo -e "${YELLOW}  Move it to $LIBRARY_DIR/agents/${id}.md first, then re-run migrate.${NC}" >&2
+        fi
+      done
+    fi
+  done
+
+  # Nothing found
+  if [[ ${#added_ids[@]} -eq 0 && ${#skipped_ids[@]} -eq 0 ]]; then
+    echo -e "${DIM}No legacy spec copies found. Nothing to migrate.${NC}"
+    return 0
+  fi
+
+  # Add verified IDs to manifest (idempotent)
+  if [[ ${#added_ids[@]} -gt 0 ]]; then
+    _ensure_manifest
+    local manifest
+    manifest="$(_manifest_path)"
+
+    for id in "${added_ids[@]}"; do
+      local type
+      type="$(_spec_type "$id")"
+      local key
+      case "$type" in
+        skill) key="skills" ;;
+        agent) key="agents" ;;
+      esac
+
+      # Idempotent: add to array only if not already present
+      jq --arg id "$id" --arg key "$key" '.[$key] |= (. + [$id] | unique)' "$manifest" > "$manifest.tmp"
+      mv "$manifest.tmp" "$manifest"
+    done
+  fi
+
+  # Summary
+  echo ""
+  if [[ ${#added_ids[@]} -gt 0 ]]; then
+    echo -e "${GREEN}Added to manifest (${#added_ids[@]}):${NC}"
+    for id in "${added_ids[@]}"; do
+      local type
+      type="$(_spec_type "$id")"
+      echo -e "  ${GREEN}+${NC} $id ($type)"
+    done
+  fi
+
+  if [[ ${#skipped_ids[@]} -gt 0 ]]; then
+    echo ""
+    echo -e "${YELLOW}Skipped (${#skipped_ids[@]} — not in cold library):${NC}"
+    for id in "${skipped_ids[@]}"; do
+      echo -e "  ${YELLOW}-${NC} $id"
+    done
+  fi
+
+  echo ""
+  echo -e "${BOLD}Next steps:${NC}"
+  echo -e "  1. Review the manifest: ${DIM}cat .agents/specs-sync.json${NC}"
+  echo -e "  2. Delete legacy copies (if satisfied):"
+
+  local has_claude_skills=false has_claude_agents=false
+  local has_github_skills=false has_github_agents=false
+
+  for pdir in "${scan_dirs[@]}"; do
+    local rel_dir="${pdir#$project_root/}"
+    if [[ -d "$pdir/skills" ]]; then
+      # Check if any non-symlink entries remain
+      for entry in "$pdir/skills"/*/; do
+        [[ -d "$entry" ]] || continue
+        [[ -L "${entry%/}" ]] && continue
+        if [[ "$rel_dir" == ".claude" ]]; then has_claude_skills=true; fi
+        if [[ "$rel_dir" == ".github" ]]; then has_github_skills=true; fi
+        break
+      done
+    fi
+    if [[ -d "$pdir/agents" ]]; then
+      for entry in "$pdir/agents"/*.md; do
+        [[ -f "$entry" ]] || continue
+        [[ -L "$entry" ]] && continue
+        if [[ "$rel_dir" == ".claude" ]]; then has_claude_agents=true; fi
+        if [[ "$rel_dir" == ".github" ]]; then has_github_agents=true; fi
+        break
+      done
+    fi
+  done
+
+  local rm_parts=()
+  [[ "$has_claude_skills" == true ]] && rm_parts+=(".claude/skills/")
+  [[ "$has_claude_agents" == true ]] && rm_parts+=(".claude/agents/")
+  [[ "$has_github_skills" == true ]] && rm_parts+=(".github/skills/")
+  [[ "$has_github_agents" == true ]] && rm_parts+=(".github/agents/")
+
+  if [[ ${#rm_parts[@]} -gt 0 ]]; then
+    echo -e "     ${DIM}rm -rf ${rm_parts[*]}${NC}"
+  fi
+
+  echo -e "  3. Commit the manifest: ${DIM}git add .agents/specs-sync.json && git commit -m 'chore: migrate to manifest-based spec loading'${NC}"
+}
+
 cmd_generate_library() {
   _check_deps
 
@@ -1202,6 +1377,7 @@ main() {
     sync)       shift; cmd_sync "$@" ;;
     init)       shift; cmd_init "$@" ;;
     clean)      shift; cmd_clean "$@" ;;
+    migrate)    shift; cmd_migrate "$@" ;;
     generate-library) shift; cmd_generate_library "$@" ;;
     load)       shift; cmd_load "$@" ;;
     unload)     shift; cmd_unload "$@" ;;
