@@ -99,6 +99,11 @@ _spec_source_path() {
   fi
 }
 
+_extract_fm_field() {
+  local file="$1" field="$2"
+  sed -n '/^---$/,/^---$/p' "$file" | grep -m1 "^${field}:" | sed "s/^${field}:[[:space:]]*//" || true
+}
+
 _manifest_path() {
   local project_root
   project_root="$(_project_root)"
@@ -1272,12 +1277,6 @@ cmd_generate_library() {
   for oid in "${!existing_specs[@]}"; do
     old_ids["$oid"]=1
   done
-
-  # Helper: extract frontmatter field from a markdown file
-  _extract_fm_field() {
-    local file="$1" field="$2"
-    sed -n '/^---$/,/^---$/p' "$file" | grep -m1 "^${field}:" | sed "s/^${field}:[[:space:]]*//" || true
-  }
 
   local specs_json="[]"
   local -A new_ids
