@@ -167,6 +167,8 @@ After all plan steps are implemented and tests pass, dispatch an **Opus Reviewer
 ```
 You are a code reviewer. Review the implementation against the plan.
 
+**Methodology**: Use the `critical-code-reviewer` skill for your review methodology. Apply its adversarial lens, detection patterns, and severity tiers to assess the implementation.
+
 ## Plan File
 Read this: <PLAN_FILE_PATH>
 

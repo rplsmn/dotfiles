@@ -163,6 +163,8 @@ Dispatch a **Task subagent** (model: opus, subagent_type: code-reviewer) with th
 ```
 You are a code reviewer. Review the implementation plan against the actual source code.
 
+**Methodology**: Use the `critical-code-reviewer` skill for your review methodology. Apply its adversarial lens, detection patterns, and severity tiers to assess the plan's proposed code.
+
 ## Plan File
 Read this file: <PLAN_FILE_PATH>
 
