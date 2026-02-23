@@ -5,6 +5,13 @@ set -e
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# --- Config file (persistent repo path for specs-sync publish, etc.) ---
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/llm-specs"
+mkdir -p "$CONFIG_DIR"
+cat > "$CONFIG_DIR/config" <<EOF
+REPO="$REPO_DIR"
+EOF
+
 echo "==> Syncing configs from $REPO_DIR"
 
 # --- Shell config (append, idempotent via marker block) ---
