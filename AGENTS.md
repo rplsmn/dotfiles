@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to LLMs working inside CLI tools when working with code in this repository.
+This file provides guidance to LLMs working with code in this repository.
 
 ## What This Repo Is
 
@@ -8,7 +8,7 @@ A personal LLM skill/agent management system and developer environment bootstrap
 
 It also provisions:
 - CLI AI assistants (Claude Code, GitHub Copilot CLI, Mistral Vibe, OpenCode)
-- Shell configuration (`.bashrc`, `.gitconfig`) — legacy from when this was a machine-sync repo; may be extracted later
+- Git configuration (`.gitconfig`) — legacy from when this was a machine-sync repo; may be extracted later
 
 ### What Makes This Different
 
@@ -35,7 +35,7 @@ There is no build system, test suite, linter, or CI/CD. All scripts are pure Bas
 
 ```
 shared-safe-config/
-├── skills/                          # 69 skills (SKILL.md + optional references/)
+├── skills/                          # skills (SKILL.md + optional references/)
 │   ├── git-commit/SKILL.md
 │   ├── systematic-debugging/SKILL.md
 │   ├── test-driven-development/SKILL.md
@@ -48,17 +48,17 @@ shared-safe-config/
 │   ├── specs-sync                   # Cold Specs Library CLI (~1760 lines Bash)
 │   ├── machine-sync                 # Pull repo + run sync.sh
 │   └── artifact-sync                # Clone/pull artifacts repo to ~/.artifacts/
-├── claude-code/
+├── claude-code/		     # Manage settings specific to Claude Code  
 │   ├── claude-global-settings.json  # Global Claude Code settings
 │   └── claude-statusline.sh         # Status line script
-├── copilot-cli/
+├── copilot-cli/		     # Manage settings specific to Copilot CLI
 │   └── copilot-commit-message-instructions.md
-├── library.json                     # Registry of all specs (~950 lines)
+├── library.json                     # Registry of all specs (~950 line, use grep to search)
 ├── global-instructions.md           # Shared LLM instructions for all tools
 ├── install.sh                       # One-time bootstrap
 ├── sync.sh                          # Re-runnable config sync
 ├── dot_bashrc                       # Shell config: tool wrappers, session lifecycle
-├── dot_gitconfig                    # Git aliases and config
+├── dot_gitconfig                    # Git aliases and config - soon to be deprecated
 ├── AGENTS.md                        # This file
 └── CLAUDE.md                        # Points to AGENTS.md
 ```
@@ -122,12 +122,12 @@ Bash CLI (`set -euo pipefail`). Subcommands:
 | `clean [--project]` | Remove stale non-symlinks from global dirs (or project dir with `--project`) |
 | `add <id>` | Add spec ID to project manifest (`.agents/specs-sync.json`) |
 | `remove <id>` | Remove spec ID from project manifest |
-| `refresh [--quiet]` | Update project staging from cold library, auto-commit if changed |
+| `refresh [--quiet]` | Update project staging from cold library |
 | `load <id>` | JIT-load a spec into the active session staging dir |
 | `unload <id>` | Remove a spec from the active session staging dir |
 | `loaded` | Show specs in the active session (with provenance: `[manifest]` vs `[loaded]`) |
 | `status` | Show core specs + project manifest + session state |
-| `init` | Create project directory structure (`.agents/`, `.claude/`, `.github/`) |
+| `init` | Create project directory structure (`.agents/`, `.claude/`, `.github/` and `AGENTS.md`) |
 | `list [--tag TAG] [--type TYPE]` | List specs with optional filters |
 | `search <query>` | Keyword search across specs |
 | `generate-library` | Regenerate `library.json` from disk contents (preserves existing metadata) |
@@ -198,7 +198,6 @@ LLM session outputs (plans, research, session notes) are stored in `~/.artifacts
 The system works but is a ~1760-line Bash script reaching its limits. Recent work (Feb 2026) added session-scoped staging directories (#10), the publish flow (#11), and project-level clean (#14). Open issues:
 
 - **#12 — CLI Rewrite RFC**: Rewrite `specs-sync` in Rust as a proper CLI with package manager capabilities (semantic versioning, lock files, registry support, self-update). This is the main planned effort.
-- **#5 — Cleanup**: One-time removal of renamed binaries on existing machines.
 
 ### Planned: Rust CLI Rewrite
 
