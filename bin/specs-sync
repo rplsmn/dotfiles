@@ -101,7 +101,7 @@ _spec_source_path() {
 
 _extract_fm_field() {
   local file="$1" field="$2"
-  sed -n '/^---$/,/^---$/p' "$file" | grep -m1 "^${field}:" | sed "s/^${field}:[[:space:]]*//" || true
+  sed 's/\r$//' "$file" | sed -n '/^---$/,/^---$/p' | grep -m1 "^${field}:" | sed "s/^${field}:[[:space:]]*//; s/^[\"']//; s/[\"']$//" || true
 }
 
 _resolve_source_repo() {
