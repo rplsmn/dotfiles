@@ -1,7 +1,7 @@
 [user]
-# Please adapt and uncomment the following lines:
 	name = Raphael Simon
 	email = 74007913+rplsmn@users.noreply.github.com
+
 [alias]
 	ls = log --pretty=format:"%C(yellow)%h%Cred%d\\ %Creset%s%Cblue\\ [%cn]" --decorate
 	ll = log --pretty=format:"%C(yellow)%h%Cred%d\\ %Creset%s%Cblue\\ [%cn]" --decorate --numstat
@@ -55,5 +55,51 @@
 
 [credential]
 	helper = cache
+
 [init]
 	defaultBranch = main
+
+[diff]
+        algorithm = histogram
+        colorMoved = plain
+        mnemonicPrefix = true
+
+[push]
+        default = simple
+        autoSetupRemote = true
+        followTags = true
+
+[fetch]
+        prune = true
+        pruneTags = true
+        all = true
+
+[column]
+        ui = auto
+
+[branch]
+        sort = -committerdate
+
+[tag]
+        sort = version:refname
+
+[help]
+        autocorrect = prompt
+
+[commit]
+        verbose = true
+
+[rerere]
+        enabled = true
+        autoupdate = true
+
+[core]
+        excludesfile = ~/.gitignore
+
+[rebase]
+        autoSquash = true
+        autoStash = true
+        updateRefs = true
+
+[pull]
+        rebase = true
