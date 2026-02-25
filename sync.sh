@@ -41,18 +41,8 @@ mkdir -p "$HOME/.local/bin"
 cp "$REPO_DIR/bin/specs-sync" "$HOME/.local/bin/specs-sync"
 chmod +x "$HOME/.local/bin/specs-sync"
 
-# --- LLM specs library (cold storage) ---
-echo "==> Syncing specs to library"
-LIBRARY_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/llm-specs"
-mkdir -p "$LIBRARY_DIR"
-# Clean and repopulate cold library (removes stale entries)
-rm -rf "$LIBRARY_DIR/skills" "$LIBRARY_DIR/agents"
-cp -r "$REPO_DIR/skills" "$LIBRARY_DIR/"
-cp -r "$REPO_DIR/agents" "$LIBRARY_DIR/"
-cp "$REPO_DIR/library.json" "$LIBRARY_DIR/"
-
-# --- Activate core specs + rebuild symlinks (all global dirs) ---
-echo "==> Activating core specs (global symlinks)"
+# --- Specs: update cold library + activate core symlinks ---
+echo "==> Syncing specs (cold library + global symlinks)"
 "$HOME/.local/bin/specs-sync" sync --quiet
 
 # --- Global instructions ---

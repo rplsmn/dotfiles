@@ -817,7 +817,6 @@ cmd_refresh() {
 
 cmd_sync() {
   _check_deps
-  _check_library
 
   local quiet=false
   while [[ $# -gt 0 ]]; do
@@ -826,6 +825,31 @@ cmd_sync() {
       *)       shift ;;
     esac
   done
+
+  # --- Step 1: Update cold library from source repo ---
+  local source_repo
+  if source_repo="$(_resolve_source_repo 2>/dev/null)"; then
+    mkdir -p "$LIBRARY_DIR"
+    rm -rf "$LIBRARY_DIR/skills" "$LIBRARY_DIR/agents"
+    cp -r "$source_repo/skills" "$LIBRARY_DIR/"
+    cp -r "$source_repo/agents" "$LIBRARY_DIR/"
+    cp "$source_repo/library.json" "$LIBRARY_DIR/"
+    if [[ "$quiet" == false ]]; then
+      echo -e "${GREEN}✓ Cold library updated from $source_repo${NC}"
+    fi
+  else
+    # No source repo found — fall back to existing cold library if present
+    if [[ ! -f "$LIBRARY_JSON" ]]; then
+      echo -e "${RED}Error: No source repo and no existing cold library.${NC}" >&2
+      echo -e "${DIM}Run sync.sh first to bootstrap, or set SPECS_SYNC_REPO.${NC}" >&2
+      exit 1
+    fi
+    if [[ "$quiet" == false ]]; then
+      echo -e "${YELLOW}Warning: Source repo not found. Rebuilding symlinks from existing cold library.${NC}" >&2
+    fi
+  fi
+
+  # --- Step 2: Rebuild global symlinks from cold library ---
 
   # Clear existing symlinks in global tool dirs (only symlinks, not real files/dirs)
   for tool_dir in "${GLOBAL_TOOL_DIRS[@]}"; do
