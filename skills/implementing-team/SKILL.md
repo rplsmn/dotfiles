@@ -1,16 +1,16 @@
 ---
 name: implementing-team
-description: "Dispatch an implementation team: Opus coder-reviewer agents implement tasks from existing plans with TDD, iterated review, and decision logging."
+description: "Dispatch an implementation team: Haiku messengers coordinate Opus 4.6 coders (TDD, lean) and Opus 4.6 reviewers to implement tasks from existing plans."
 ---
 
 # /implementing-team
 
-Dispatch an implementation team to execute existing plans using TDD. Each task gets an **Opus coder-reviewer agent** that implements, self-reviews via a reviewer sub-agent, and iterates until approved.
+Dispatch an implementation team to execute existing plans using TDD. A single Opus sub-orchestrator manages all coder-reviewer agents, merging, testing, and PR creation — keeping the main orchestrator lean.
 
 ## Arguments
 
 - **mode**: `parallel` (default) or `sequential`
-  - `parallel`: All tasks dispatched simultaneously, each in its own **git worktree** for true isolation. Orchestrator merges branches after.
+  - `parallel`: All tasks dispatched simultaneously, each in its own **git worktree** for true isolation. Sub-orchestrator merges branches after.
   - `sequential`: Tasks dispatched one at a time. Each coder works in the tree left by the previous one. Use when tasks share files or build on each other.
 
 Parse `mode` from `$ARGUMENTS`. If `$ARGUMENTS` contains `sequential`, set mode to sequential. Otherwise default to `parallel`.
@@ -18,74 +18,121 @@ Parse `mode` from `$ARGUMENTS`. If `$ARGUMENTS` contains `sequential`, set mode 
 ## Team Structure
 
 ```
-Orchestrator (you)
+Orchestrator (you — stays lean, never compacts)
 │
 ├── Phase 0: Context Gathering
-│   ├── Locate plans, read project docs
-│   ├── Skill Discovery → finds relevant skills for the stack via specs-sync
-│   ├── Derive review criteria from skills + docs + plans
-│   └── Ensure feature branch exists
+│   ├── Locate plans + spec file, read project docs
+│   ├── Skill Discovery → specs-sync search + load
+│   ├── Derive review criteria from spec + docs + plans
+│   ├── Ensure feature branch exists
+│   └── Detect test command
 │
-├── Phase 1: Dispatch Coder-Reviewer Agents
-│   └── Per task: Opus agent (isolation: worktree if parallel)
-│       ├── Implements with TDD (red → green → refactor)
-│       ├── Commits implementation
-│       ├── Dispatches Opus Reviewer sub-subagent (critical-code-reviewer methodology)
-│       ├── Reads review, applies fixes, commits fixes
-│       ├── Loops until LGTM (max 3 rounds)
-│       └── Reports: status, files, tests, decision log
-│
-├── Phase 2: Merge (parallel mode only)
-│   └── Merge worktree branches into feature branch
-│
-├── Phase 3: Verify, Push & PR
-│   ├── Run full test suite
-│   ├── Push
-│   └── Open PR with summary + decision log
-│
-└── Phase 4: Report
-    └── Summary table + decision log + next steps
+└── Phase 1: Delegate to Implementation Dispatch Sub-Orchestrator
+    └── Opus sub-orchestrator (single Task agent)
+        ├── Reads spec + plans
+        ├── Dispatches Opus Coder-Reviewer agents (one per task)
+        │   ├── Implements with TDD (red → green → refactor)
+        │   ├── Commits implementation
+        │   ├── Dispatches Opus Reviewer (critical-code-reviewer methodology)
+        │   ├── Applies fixes, loops until LGTM (max 3 rounds)
+        │   └── Reports: status, files, tests, decision log
+        ├── Merges worktree branches (parallel mode)
+        ├── Runs full test suite
+        ├── Pushes and opens PR
+        └── Returns summary + PR URL to you
 ```
 
 ## Your Role (Orchestrator)
 
-1. **Locate the plans** — each task must have an existing plan. If no plan exists, stop and tell the user to run `/planning-team` first.
-2. **Prepare context** — read project docs for conventions, detect the test command, discover relevant skills, derive review criteria
+1. **Locate the plans and spec** — each task must have an existing plan. The spec file from `/planning-team` should exist in ARTIFACTS_DIR. If no plan exists, stop and tell the user to run `/planning-team` first.
+2. **Prepare context** — read project docs for conventions, detect the test command, discover and load relevant skills, derive review criteria
 3. **Create feature branch** if on main: `git checkout -b feature/<description>`
-4. **Dispatch agents** — one Opus agent per task
-5. **Merge worktree branches** (parallel mode) — merge each agent's branch into the feature branch
-6. **Verify & push** — run tests yourself, push
-7. **Preserve your context** — rely on agent status reports; do NOT read all the code changes
+4. **Delegate all implementation work** — dispatch a single Opus sub-orchestrator that handles coder-reviewer dispatch, merging, testing, pushing, and PR creation
+5. **Present results** — relay the sub-orchestrator's summary and PR URL to the user
+
+**Context discipline**: After Phase 0, you delegate ALL implementation work. You never read code changes or plan details. Your context stays lean: context gathering notes + summary from sub-orchestrator.
 
 ---
 
 ## Phase 0: Context Gathering
 
 1. Read project docs (CLAUDE.md, AGENTS.md) for conventions, test command, and coding style
-2. **Discover relevant skills**: Run `specs-sync list` and `specs-sync search <terms>` (using terms from the project's stack, frameworks, domain) to find skills that provide expertise for this project's technology. Read the matched skills — they contain patterns, idioms, and common pitfalls that inform review criteria. **Record the absolute file paths** of each relevant skill (e.g. `~/.local/share/llm-specs/skills/<name>/SKILL.md`) — these will be passed to subagents so they can read the full skill content themselves.
-3. Identify the implementation plans from the user's prompt or the artifacts directory
-4. Detect the test command (from project docs or common patterns like `npm test`, `pytest`, `cargo test`, `go test`, etc.)
-5. Ensure you're on a feature branch. If on main, create one: `git checkout -b feature/<description>`
-6. **Derive review criteria**: Before dispatching any agents, synthesize review criteria from three sources:
-   - **Skills**: What patterns, idioms, and pitfalls do the discovered skills highlight for this stack? What does "good" look like according to the expertise available?
-   - **Project docs**: What conventions, priorities, architectural constraints, and testing strategies does the project mandate?
-   - **Plans**: What risks do the implementation plans flag? What areas are complex or novel enough to warrant extra scrutiny?
+2. **Discover relevant skills**: Run `specs-sync search <terms>` (using terms from the project's stack, frameworks, domain) to find skills that provide expertise for this project's technology. For each relevant skill, run `specs-sync load <id>` to hotload it into the current session. Then read the loaded skills to understand patterns, idioms, and common pitfalls — this knowledge informs review criteria.
 
-   Write the criteria as a short numbered list. These are injected into every agent prompt as `<REVIEW_CRITERIA>`.
+   **Do NOT**: record absolute file paths, pass skill paths to subagents, or use any `specs-sync` subcommand other than `search`, `list`, `load`, `unload`, `loaded`, and `status`.
+3. Identify the implementation plans from the user's prompt or the artifacts directory
+4. Locate the spec file (from `/planning-team`) in ARTIFACTS_DIR — it contains the validated design decisions and user-approved review criteria
+5. Detect the test command (from project docs or common patterns like `npm test`, `pytest`, `cargo test`, `go test`, etc.)
+6. Ensure you're on a feature branch. If on main, create one: `git checkout -b feature/<description>`
+7. **Derive review criteria**: Synthesize review criteria from:
+   - **Spec file**: The review criteria co-created with the user during planning
+   - **Loaded skills**: Patterns, idioms, and pitfalls for this stack
+   - **Project docs**: Conventions, priorities, architectural constraints, testing strategies
+   - **Plans**: Risks flagged, complex or novel areas warranting extra scrutiny
+
+   Write the criteria as a short numbered list. These are injected into the sub-orchestrator prompt.
 
 ---
 
-## Phase 1: Dispatch Coder-Reviewer Agents
+## Phase 1: Delegate to Implementation Dispatch Sub-Orchestrator
 
-For each task, dispatch a **Task subagent** (`model: opus`, `subagent_type: general-purpose`).
+Dispatch a **single Opus sub-orchestrator** (`model: opus`, `subagent_type: general-purpose`) that manages all implementation work.
 
-**If mode is `parallel`**: dispatch ALL agents in a single response, each with `isolation: "worktree"`. Tasks get true file-system isolation — no conflict risk.
+This delegation keeps your context lean. You do NOT read code changes, manage review rounds, merge branches, or track individual coder agents. The sub-orchestrator handles everything and returns a summary.
 
-**If mode is `sequential`**: dispatch one at a time. Wait for completion before dispatching the next. No worktree — each coder works in the current tree.
-
-### Coder-Reviewer Agent Prompt Template
+### Sub-Orchestrator Prompt Template
 
 ````
+You are an implementation dispatch orchestrator. Your job is to dispatch coder-reviewer agents for each task, merge their work, run tests, push, open a PR, and report a summary.
+
+## Spec File
+
+Read this file for the validated design decisions and constraints agreed with the user:
+<SPEC_FILE_PATH>
+
+## Implementation Plans
+
+These are the plan files to implement (read each one):
+<LIST_OF_PLAN_FILE_PATHS>
+
+## Mode: <parallel|sequential>
+
+## Test Command
+
+<TEST_COMMAND>
+
+## Feature Branch
+
+You are on branch: <BRANCH_NAME>
+
+## Review Criteria
+
+<REVIEW_CRITERIA>
+
+## Project Conventions
+
+<SUMMARY from CLAUDE.md / AGENTS.md — style, patterns, naming, frameworks>
+
+## Working Directory
+
+<ABSOLUTE_PATH_TO_REPO>
+
+## Your Workflow
+
+### Step 1: Read Plans and Spec
+
+Read the spec file and all plan files. Extract per-task information: what to implement, source files, test cases.
+
+### Step 2: Dispatch Coder-Reviewer Agents
+
+For each task, dispatch a **Task subagent** (`model: opus`, `subagent_type: general-purpose`) using the prompt template below.
+
+**If mode is `parallel`**: dispatch ALL agents in a single response, each with `isolation: "worktree"`. Tasks get true file-system isolation — no conflict risk.
+**If mode is `sequential`**: dispatch one at a time. Wait for completion before dispatching the next. No worktree — each coder works in the current tree.
+
+#### Coder-Reviewer Agent Prompt
+
+```
 You are a coder-reviewer agent. Implement a task from an existing plan using strict TDD, get your work reviewed, and iterate until approved.
 
 ## Task: <TASK_NAME>
@@ -94,9 +141,14 @@ You are a coder-reviewer agent. Implement a task from an existing plan using str
 
 Read the plan FIRST: <PLAN_FILE_PATH>
 
+## Spec File
+
+Read this for the full validated spec (design decisions, constraints, review criteria):
+<SPEC_FILE_PATH>
+
 ## Project Conventions
 
-<SUMMARY from CLAUDE.md / AGENTS.md — style, patterns, naming, frameworks>
+<CONVENTIONS>
 
 ## Test Command
 
@@ -104,14 +156,9 @@ Read the plan FIRST: <PLAN_FILE_PATH>
 
 ## Review Criteria
 
-The orchestrator derived these criteria from the project's skills, documentation, and implementation plans. The reviewer will evaluate your code against them.
+The following criteria were co-created with the user. The reviewer will evaluate your code against them.
 
 <REVIEW_CRITERIA>
-
-## Reference Skills
-
-The criteria above were derived from these skills. Read them for full stack-specific guidance (patterns, idioms, pitfalls):
-<LIST_OF_SKILL_FILE_PATHS>
 
 ## Working Directory
 
@@ -159,7 +206,7 @@ If the plan is followed exactly with no surprises, the decision log is empty. Th
 
 After all plan steps are implemented and tests pass, dispatch an **Opus Reviewer subagent** (model: opus, subagent_type: code-reviewer) with this prompt:
 
-```
+---
 You are a critical code reviewer. Review the implementation against the plan using an adversarial mindset — guilty until proven exceptional.
 
 **Methodology**: Use the `critical-code-reviewer` skill for your review methodology. Apply its adversarial lens, detection patterns, and severity tiers to assess the implementation.
@@ -167,19 +214,17 @@ You are a critical code reviewer. Review the implementation against the plan usi
 ## Plan File
 Read this: <PLAN_FILE_PATH>
 
+## Spec File
+Read this: <SPEC_FILE_PATH>
+
 ## Test Command
 <TEST_COMMAND>
 
-## Review Criteria (derived from project context)
+## Review Criteria (co-created with the user)
 
-Apply these project-specific criteria as your evaluation framework:
+Apply these criteria as your evaluation framework:
 
 <REVIEW_CRITERIA>
-
-## Reference Skills
-
-Read these for full stack-specific guidance to inform your review:
-<SAME SKILL FILE PATHS AS CODER>
 
 ## Review Process
 
@@ -221,7 +266,7 @@ For each issue:
 - **Fix**: specific, actionable fix
 
 End with verdict: **LGTM** or **NEEDS FIXES** (list which BLOCKING and REQUIRED issues must be fixed)
-```
+---
 
 ### Step 6: Fix Loop
 
@@ -240,7 +285,6 @@ If not LGTM after 3 rounds, note remaining issues in your report.
 
 Report back with EXACTLY this format:
 
-```
 ## Status: done / stuck (with reason)
 
 ## Files Created
@@ -262,45 +306,36 @@ Report back with EXACTLY this format:
 - [AMBIGUITY] ...
 (or: No deviations from plan.)
 ```
-````
 
----
+### Step 3: Merge (Parallel Mode Only)
 
-## Phase 2: Merge (Parallel Mode Only)
-
-When all agents complete in parallel mode, each returns a worktree branch.
+When all coder-reviewer agents complete in parallel mode, each returns a worktree branch.
 
 1. For each completed agent, merge its branch into the feature branch:
    ```
    git merge <worktree-branch> --no-edit
    ```
-2. If a merge conflict occurs: **stop and report to the user**. Do NOT auto-resolve merge conflicts. Show which files conflict and between which tasks.
+2. If a merge conflict occurs: **stop and report to the orchestrator**. Do NOT auto-resolve merge conflicts. Show which files conflict and between which tasks.
 3. After successful merge, clean up the worktree branch:
    ```
    git branch -d <worktree-branch>
    ```
 4. Run the full test suite after all merges to catch integration issues.
 
-Skip this phase in sequential mode — agents already worked in the same tree.
+Skip this step in sequential mode — agents already worked in the same tree.
 
----
-
-## Phase 3: Verify, Push & PR
-
-Agents have already committed their work. The orchestrator's job is to verify the integrated result, push, and open a PR.
+### Step 4: Verify, Push & PR
 
 1. **Run tests**: Execute the test command on the merged tree. Only check the summary; read full output only on failure.
 2. **Check the log**: `git log --oneline` to see the commit history left by agents.
-3. **Push**: `git push -u origin <branch>`
+3. **Push**: `git push -u origin <BRANCH_NAME>`
 4. **Open PR**: Use `gh pr create` with:
    - Title: concise description of the feature/change
-   - Body: the summary table + consolidated decision log from Phase 4 (write body first, then create PR)
+   - Body: the summary table + consolidated decision log (write body first, then create PR)
 
----
+### Step 5: Report
 
-## Phase 4: Report
-
-Print a summary table:
+Return EXACTLY this format to the orchestrator:
 
 ```
 | Task | Files | Tests | Rounds | Verdict | Decisions |
@@ -308,16 +343,27 @@ Print a summary table:
 | <name> | <created>/<modified> | <new>/<total> passing | N | LGTM | N deviations |
 ```
 
-Then print the **consolidated decision log** — all DEVIATION, AMBIGUITY, and SKIP entries across all tasks. This is the key information for the user: where reality diverged from the plan.
+Consolidated decision log (all DEVIATION, AMBIGUITY, SKIP entries across all tasks).
 
-Finally: branch name, commit count, and the PR URL.
+Branch: <branch name>
+Commits: <count>
+PR: <URL>
+````
+
+### Orchestrator During Phase 1
+
+While the sub-orchestrator works:
+- Do NOT read code changes or plan details — the sub-orchestrator handles everything
+- When the sub-orchestrator returns, relay its summary table, decision log, and PR URL to the user
 
 ---
 
 ## Rules
 
 - **Plans must exist** — this command implements existing plans, it does not create them
-- **Review criteria are derived JIT** — synthesized from discovered skills, project docs, and implementation plans; never hardcoded or assumed
+- **Spec file guides implementation** — the spec from `/planning-team` contains validated design decisions and review criteria
+- **Review criteria build on the spec** — start from the user-approved criteria in the spec, augmented with skill and plan insights
+- **Implementation dispatch is delegated** — a sub-orchestrator manages all coder-reviewer agents; the main orchestrator stays lean
 - **Coders and reviewers are Opus** — high-effort, maximum quality
 - **TDD is non-negotiable** — red → green → refactor, always
 - **Lean approach** — smallest code that works, no speculative features
@@ -328,6 +374,8 @@ Finally: branch name, commit count, and the PR URL.
 - **Coder self-fixes** — the same agent that wrote the code applies review fixes (has full context)
 - **Parallel uses worktrees** — `isolation: "worktree"` on each Task call for true isolation
 - **Merge conflicts are human problems** — never auto-resolve, always report
-- **Orchestrator verifies** — always run tests yourself before pushing
+- **Sub-orchestrator verifies** — always run tests before pushing
 - **Coders commit their work** — implementation commit + fix commits per review round, giving reviewers clean diffs
 - **Sequential preserves tree state** — each coder works in the tree the previous one left
+- **Orchestrator never compacts** — context discipline through delegation, not through reading everything yourself
+- **Skills are loaded, not passed** — use `specs-sync load <id>` to hotload skills; never pass absolute file paths to subagents
