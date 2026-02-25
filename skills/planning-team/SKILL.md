@@ -5,7 +5,7 @@ description: "Brainstorm with the user, then dispatch Opus planners and reviewer
 
 # /planning-team
 
-Brainstorm interactively with the user to produce a validated spec, then dispatch Opus planner-reviewer agents to write detailed implementation plans with iterated review.
+Brainstorm interactively with the user to produce a validated spec, then dispatch an Opus sub-orchestrator that manages planner-reviewer agents to write detailed implementation plans with iterated review.
 
 ## Arguments
 
@@ -18,38 +18,42 @@ Parse `mode` from `$ARGUMENTS`. If `$ARGUMENTS` contains `sequential`, set mode 
 ## Team Structure
 
 ```
-Orchestrator (you)
+Orchestrator (you — stays lean, never compacts)
 │
 ├── Phase 0: Context Gathering
 │   ├── Explore subagent → reads source files + project docs
-│   └── Skill Discovery → finds relevant skills for the stack via specs-sync
+│   └── Skill Discovery → specs-sync search + load
 │
 ├── Phase 1: Brainstorming (you + user, interactive)
 │   ├── Ask questions one at a time
 │   ├── Present design in sections, validate each
-│   ├── Synthesize review criteria from skills + docs + context
-│   └── Output: validated spec + task list + source file list + review criteria
+│   ├── Co-create review criteria with user
+│   ├── Save spec file to ARTIFACTS_DIR
+│   └── Output: spec file path + task list
 │
-├── Phase 2: Plan-Review Dispatch (per task)
-│   └── Opus Planner-Reviewer agent
-│       ├── Writes plan from validated spec
-│       ├── Dispatches Opus Reviewer sub-subagent (critical-code-reviewer methodology)
-│       ├── Reads review, applies fixes to its own plan
-│       └── Loops until READY (max 3 rounds)
-│
-└── Phase 3: Report
-    └── Summary table, file paths, blockers
+└── Phase 2: Delegate to Planning Dispatch Sub-Orchestrator
+    └── Opus sub-orchestrator (single Task agent)
+        ├── Reads spec file
+        ├── Dispatches Opus Planner-Reviewer agents (one per task)
+        │   ├── Reads spec + source files, writes plan
+        │   ├── Dispatches Opus Reviewer (critical-code-reviewer methodology)
+        │   ├── Applies fixes, loops until READY (max 3 rounds)
+        │   └── Reports status
+        ├── Collects results
+        └── Returns summary table to you
 ```
 
 ## Your Role (Orchestrator)
 
 You are the orchestrator. Your job is:
 
-1. **Gather context** — dispatch Explore subagent, read project docs, discover relevant skills
-2. **Brainstorm with the user** — interactive design session producing a validated spec and review criteria
-3. **Dispatch planner-reviewer agents** — one Opus agent per task
-4. **Collect results** — wait for all agents, report status
-5. **Preserve your context** — do NOT read the full plans; rely on agent status reports
+1. **Gather context** — dispatch Explore subagent, read project docs, discover and load relevant skills
+2. **Brainstorm with the user** — interactive design session producing a validated spec, review criteria, and task list
+3. **Save the spec** — write it to ARTIFACTS_DIR as the single source of truth
+4. **Delegate plan dispatch** — hand off to a sub-orchestrator agent that manages all planner-reviewer agents
+5. **Present results** — relay the sub-orchestrator's summary to the user
+
+**Context discipline**: After Phase 1, you delegate ALL plan-related work. You never read plan contents. Your context stays lean: brainstorming conversation + spec file path + summary from sub-orchestrator.
 
 ---
 
@@ -60,13 +64,15 @@ Before engaging the user:
 1. Read project docs (CLAUDE.md, AGENTS.md, README) for conventions and structure
 2. Dispatch an **Explore subagent** (`subagent_type: Explore`) to read source files relevant to the user's prompt
 3. Identify the artifacts directory: `~/.artifacts/<project>/plans/` or the project's designated plans folder
-4. **Discover relevant skills**: Run `specs-sync list` and `specs-sync search <terms>` (using terms from the project's stack, frameworks, domain) to find skills that provide expertise for this project's technology. Read the matched skills — they contain patterns, idioms, and common pitfalls that will inform review criteria in Phase 1. **Record the absolute file paths** of each relevant skill (e.g. `~/.local/share/llm-specs/skills/<name>/SKILL.md`) — these will be passed to subagents so they can read the full skill content themselves.
+4. **Discover relevant skills**: Run `specs-sync search <terms>` (using terms from the project's stack, frameworks, domain) to find skills that provide expertise for this project's technology. For each relevant skill, run `specs-sync load <id>` to hotload it into the current session. Then read the loaded skills to understand patterns, idioms, and common pitfalls — this knowledge informs review criteria synthesis in Phase 1.
+
+**Do NOT**: record absolute file paths, pass skill paths to subagents, or use any `specs-sync` subcommand other than `search`, `list`, `load`, `unload`, `loaded`, and `status`.
 
 ---
 
 ## Phase 1: Brainstorming (Interactive)
 
-**Goal**: Produce a validated spec AND review criteria. ALL design decisions are made HERE, not by the planner.
+**Goal**: Produce a validated spec, review criteria, and task list. ALL design decisions are made HERE, not by the planner.
 
 **This phase is non-negotiable. It always happens before any plan dispatch.**
 
@@ -84,14 +90,30 @@ Before engaging the user:
    - Per task: what to build, data flow, naming, design decisions made + rationale
    - Source files each planner needs to read
    - Shared conventions and constraints
-6. **Synthesize review criteria** — as the FINAL step before dispatch, derive review criteria from three sources and present them to the user:
-   - **Skills**: What patterns, idioms, and pitfalls do the discovered skills highlight for this stack? What does "good" look like according to the expertise available?
+
+6. **Co-create review criteria with the user** — this is a MANDATORY, EXPLICIT step. Do NOT skip it. Do NOT synthesize criteria silently. Present a numbered list derived from three sources:
+   - **Loaded skills**: What patterns, idioms, and pitfalls do the loaded skills highlight for this stack? What does "good" look like according to the expertise available?
    - **Project docs**: What conventions, priorities, architectural constraints, and testing strategies does the project mandate?
    - **Brainstorming context**: What did the user emphasize? What scope decisions create risk? What areas need extra scrutiny?
 
-   Present the criteria as a short numbered list: "Here's what I'll hold the plans to — does this cover what matters?" The user validates or adjusts. These criteria become part of the spec.
+   Present the criteria explicitly: "Here are the review criteria I'll hold the plans to — does this cover what matters to you?" Wait for the user to validate, adjust, or add criteria. Iterate until confirmed. These criteria become part of the spec.
 
-**Exit criteria**: User explicitly confirms the spec AND review criteria are correct. No ambiguity in scope, approach, or evaluation standards.
+### Save the Spec
+
+**After the user confirms both the spec AND the review criteria**, save the full document to:
+
+`<ARTIFACTS_DIR>/<date>-<slug>-spec.md`
+
+The spec file MUST contain:
+- All design decisions and rationale from brainstorming
+- Task list with descriptions
+- Source files per task
+- Shared conventions and constraints
+- The validated review criteria (numbered list)
+
+This file is the **single source of truth** for all downstream agents. Tell the user the file path.
+
+**Exit criteria**: User explicitly confirms the spec AND review criteria are correct. Spec file is saved to ARTIFACTS_DIR. No ambiguity in scope, approach, or evaluation standards.
 
 ### YAGNI
 
@@ -99,42 +121,77 @@ During brainstorming, actively push back on unnecessary complexity. Remove featu
 
 ---
 
-## Phase 2: Plan-Review Dispatch
+## Phase 2: Delegate to Planning Dispatch Sub-Orchestrator
 
-For each task identified in Phase 1, dispatch a **Task subagent** (`model: opus`, `subagent_type: general-purpose`) that runs the full plan-review cycle internally.
+After the spec is saved, dispatch a **single Opus sub-orchestrator** (`model: opus`, `subagent_type: general-purpose`) that manages all plan-review work.
 
-**If mode is `parallel`**: dispatch ALL task agents in a single response using parallel Task tool calls.
+This delegation keeps your context lean. You do NOT read plans, manage review rounds, or track individual planner agents. The sub-orchestrator handles everything and returns a summary.
 
-**If mode is `sequential`**: dispatch one at a time. Wait for completion. Pass the previous task's plan file path as additional context to the next agent.
-
-### Planner-Reviewer Agent Prompt Template
+### Sub-Orchestrator Prompt Template
 
 ````
-You are a planner-reviewer agent. Write a detailed implementation plan, get it reviewed against the source code, and iterate until the reviewer approves.
+You are a planning dispatch orchestrator. Your job is to dispatch planner-reviewer agents for each task in the spec, collect their results, and report a summary.
 
-## Task: <TASK_NAME>
+## Spec File
 
-<TASK_DESCRIPTION from validated spec — include ALL design decisions, naming conventions, scope, rationale>
+Read this file FIRST — it contains all design decisions, task descriptions, source files, and review criteria:
+<SPEC_FILE_PATH>
 
-## Review Criteria
+## Mode: <parallel|sequential>
 
-The orchestrator derived these criteria from the project's skills, documentation, and brainstorming context. The reviewer will evaluate your plan against them.
+## Artifacts Directory
 
-<REVIEW_CRITERIA>
-
-## Reference Skills
-
-The criteria above were derived from these skills. Read them for full stack-specific guidance (patterns, idioms, pitfalls):
-<LIST_OF_SKILL_FILE_PATHS>
-
-## Source Files to Read
-
-You MUST read ALL of these files before writing the plan:
-<LIST_OF_FILE_PATHS>
+<ARTIFACTS_DIR>
 
 ## Project Conventions
 
 <SUMMARY from CLAUDE.md / AGENTS.md — style, patterns, naming, frameworks>
+
+## Your Workflow
+
+### Step 1: Read the Spec
+
+Read the spec file thoroughly. Extract:
+- The task list (each task you will dispatch a planner-reviewer for)
+- The review criteria (these get injected into every planner and reviewer prompt)
+- The source files per task
+- Shared conventions and constraints
+
+### Step 2: Dispatch Planner-Reviewer Agents
+
+For each task, dispatch a **Task subagent** (`model: opus`, `subagent_type: general-purpose`) using the prompt template below.
+
+**If mode is `parallel`**: dispatch ALL task agents in a single response using parallel Task tool calls.
+**If mode is `sequential`**: dispatch one at a time. Wait for completion. Pass the previous task's plan file path as additional context to the next agent.
+
+#### Planner-Reviewer Agent Prompt
+
+```
+You are a planner-reviewer agent. Write a detailed implementation plan, get it reviewed against the source code, and iterate until the reviewer approves.
+
+## Task: <TASK_NAME>
+
+<TASK_DESCRIPTION from spec — include ALL design decisions, naming conventions, scope, rationale>
+
+## Spec File
+
+Read this file for the full validated spec (all design decisions, constraints, and review criteria agreed with the user):
+<SPEC_FILE_PATH>
+
+## Review Criteria
+
+The following criteria were co-created with the user. The reviewer will evaluate your plan against them.
+
+<REVIEW_CRITERIA from spec>
+
+## Source Files to Read
+
+You MUST read ALL of these files before writing the plan:
+<LIST_OF_FILE_PATHS from spec>
+
+## Project Conventions
+
+<CONVENTIONS>
 
 ## Artifacts Directory
 
@@ -165,7 +222,7 @@ The plan should be detailed enough that implementation is near copy-paste trivia
 
 Dispatch a **Task subagent** (model: opus, subagent_type: code-reviewer) with this prompt:
 
-```
+---
 You are a critical plan reviewer. Review the implementation plan against the actual source code using an adversarial mindset — guilty until proven exceptional.
 
 **Methodology**: Use the `critical-code-reviewer` skill for your review methodology. Apply its adversarial lens, detection patterns, and severity tiers to assess the plan's proposed code.
@@ -173,19 +230,14 @@ You are a critical plan reviewer. Review the implementation plan against the act
 ## Plan File
 Read this file: <PLAN_FILE_PATH>
 
-## Validated Spec (what was agreed with the user)
-<SPEC_SUMMARY>
+## Spec File (what was agreed with the user)
+Read this file: <SPEC_FILE_PATH>
 
-## Review Criteria (derived from project context)
+## Review Criteria (co-created with the user)
 
-Apply these project-specific criteria as your evaluation framework:
+Apply these criteria as your evaluation framework:
 
 <REVIEW_CRITERIA>
-
-## Reference Skills
-
-Read these for full stack-specific guidance to inform your review:
-<SAME SKILL FILE PATHS AS PLANNER>
 
 ## Source Files to Read (you MUST read these independently — do NOT trust the plan's claims about them)
 <SAME FILE LIST AS PLANNER>
@@ -217,7 +269,7 @@ For each issue:
 - **Fix**: specific suggested fix
 
 End with verdict: **READY** or **NEEDS FIXES** (list which BLOCKING and REQUIRED issues must be fixed)
-```
+---
 
 ### Step 4: Apply Fixes
 
@@ -241,19 +293,15 @@ Report back with EXACTLY this format:
 - Review file: <path>
 - Review rounds: N
 - Final verdict: READY / ISSUES REMAINING (count)
-````
+```
 
-### Orchestrator During Phase 2
+### Step 3: Collect Results
 
-While planner-reviewer agents work:
-- Do NOT read the full plans — rely on agent status reports
-- Report progress to the user as results come in: "Task A: done after 2 review rounds. Task B: still running."
+Wait for all planner-reviewer agents to complete. Track progress.
 
----
+### Step 4: Report
 
-## Phase 3: Report
-
-Print a summary:
+Return EXACTLY this format to the orchestrator:
 
 ```
 | Task | Plan | Review | Rounds | Verdict |
@@ -261,7 +309,15 @@ Print a summary:
 | <name> | <path> | <path> | N | Ready / Issues |
 ```
 
-Plus: total artifact count, any tasks needing human attention, and suggested next steps (e.g., "review the plans, then use /implementing-team to execute").
+Plus: total artifact count, any tasks needing human attention, and suggested next steps.
+````
+
+### Orchestrator During Phase 2
+
+While the sub-orchestrator works:
+- Do NOT read the plans or reviews — the sub-orchestrator handles everything
+- When the sub-orchestrator returns, relay its summary table to the user
+- Add your own next-step suggestion: "review the plans, then use /implementing-team to execute"
 
 ---
 
@@ -269,15 +325,18 @@ Plus: total artifact count, any tasks needing human attention, and suggested nex
 
 - **Brainstorming is non-negotiable** — Phase 1 ALWAYS happens before any plan dispatch
 - **One question at a time** — never batch questions during brainstorming
-- **Review criteria are derived JIT** — synthesized from discovered skills, project docs, and brainstorming context; never hardcoded or assumed
+- **Review criteria are co-created with the user** — presented explicitly, validated interactively, never silently assumed
+- **Spec is saved to ARTIFACTS_DIR** — the file is the single source of truth for all downstream work
+- **Plan dispatch is delegated** — a sub-orchestrator manages all planner-reviewer agents; the main orchestrator stays lean
 - **Planners and reviewers are Opus** — thorough reasoning required
 - **Planner revises its own plan** — it has the context of WHY each decision was made
 - **Reviewer MUST read source code independently** — not just the plan
 - **Reviewer uses critical-code-reviewer methodology** — adversarial mindset, severity tiers (BLOCKING > REQUIRED > SUGGESTION)
 - **Review is iterated** — loop until READY, max 3 rounds
 - **LINE BY LINE is the standard** — the reviewer compares proposed code against actual source
-- **Orchestrator stays lean after Phase 1** — don't read plan contents during Phase 2
+- **Orchestrator never compacts** — context discipline through delegation, not through reading everything yourself
 - **Final review persisted** — saved to disk alongside the plan for traceability
 - **Artifacts are permanent** — written to `~/.artifacts/<project>/plans/`, never ephemeral
 - **Sequential mode chains context** — each agent gets the previous task's plan path as "Prior work"
 - **Never start implementing** — this command produces plans only
+- **Skills are loaded, not passed** — use `specs-sync load <id>` to hotload skills; never pass absolute file paths to subagents
