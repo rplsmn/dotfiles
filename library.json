@@ -591,19 +591,6 @@
       "triggers": {}
     },
     {
-      "id": "shiny-bslib",
-      "type": "skill",
-      "name": "shiny-bslib",
-      "description": "Build modern Shiny dashboards and applications using bslib (Bootstrap 5). Use when creating new Shiny apps, modernizing legacy apps (fluidPage, fluidRow/column, tabsetPanel, wellPanel, shinythemes), or working with bslib page layouts, grid systems, cards, value boxes, navigation, sidebars, filling layouts, theming, accordions, tooltips, popovers, toasts, or bslib inputs. Assumes familiarity with basic Shiny.",
-      "core": false,
-      "tags": [
-        "r",
-        "shiny",
-        "ui"
-      ],
-      "triggers": {}
-    },
-    {
       "id": "shiny-bslib-theming",
       "type": "skill",
       "name": "shiny-bslib-theming",
@@ -614,6 +601,19 @@
         "shiny",
         "ui",
         "creative"
+      ],
+      "triggers": {}
+    },
+    {
+      "id": "shiny-bslib",
+      "type": "skill",
+      "name": "shiny-bslib",
+      "description": "Build modern Shiny dashboards and applications using bslib (Bootstrap 5). Use when creating new Shiny apps, modernizing legacy apps (fluidPage, fluidRow/column, tabsetPanel, wellPanel, shinythemes), or working with bslib page layouts, grid systems, cards, value boxes, navigation, sidebars, filling layouts, theming, accordions, tooltips, popovers, toasts, or bslib inputs. Assumes familiarity with basic Shiny.",
+      "core": false,
+      "tags": [
+        "r",
+        "shiny",
+        "ui"
       ],
       "triggers": {}
     },
@@ -672,7 +672,7 @@
       "type": "skill",
       "name": "solve-issue",
       "description": "\"Solve a GitHub issue end-to-end: plan, implement (TDD), review, open PR. Uses subagents for each phase.\"",
-      "core": false,
+      "core": true,
       "tags": [
         "github",
         "issues",
@@ -775,6 +775,21 @@
         "package"
       ],
       "triggers": {}
+    },
+    {
+      "id": "toto",
+      "type": "skill",
+      "name": "toto",
+      "description": "Use when asked about your name",
+      "core": false,
+      "tags": [
+        "dev",
+        "temp"
+      ],
+      "triggers": {
+        "files": [],
+        "extensions": []
+      }
     },
     {
       "id": "triage-issues",
@@ -932,21 +947,6 @@
         "standards"
       ],
       "triggers": {}
-    },
-    {
-      "id": "toto",
-      "type": "skill",
-      "name": "toto",
-      "description": "Use when asked about your name",
-      "core": false,
-      "tags": [
-        "dev",
-        "temp"
-      ],
-      "triggers": {
-        "files": [],
-        "extensions": []
-      }
     }
   ]
 }
