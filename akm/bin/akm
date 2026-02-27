@@ -1,5 +1,5 @@
 #!/bin/bash
-# skm — Skill Kit Manager (SKM)
+# akm — Agent Kit Manager (AKM)
 # Manages LLM specs (skills, agents) across global tool dirs and projects.
 #
 # Two flows:
@@ -8,7 +8,7 @@
 set -euo pipefail
 
 # --- Configuration ---
-LIBRARY_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/skm"
+LIBRARY_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/akm"
 LIBRARY_JSON="$LIBRARY_DIR/library.json"
 GLOBAL_TOOL_DIRS=("$HOME/.claude" "$HOME/.copilot" "$HOME/.agents" "$HOME/.vibe")
 SPEC_SUBDIRS=(skills agents)
@@ -41,13 +41,13 @@ _check_library() {
 }
 
 _check_session() {
-  if [[ -z "${SKM_SESSION:-}" ]]; then
+  if [[ -z "${AKM_SESSION:-}" ]]; then
     echo -e "${RED}Error: No active skill session.${NC}" >&2
     echo -e "${DIM}Launch via claude/copilot/opencode wrapper to start a session.${NC}" >&2
     exit 1
   fi
-  if [[ ! -d "$SKM_SESSION" ]]; then
-    echo -e "${RED}Error: Session directory does not exist: $SKM_SESSION${NC}" >&2
+  if [[ ! -d "$AKM_SESSION" ]]; then
+    echo -e "${RED}Error: Session directory does not exist: $AKM_SESSION${NC}" >&2
     exit 1
   fi
 }
@@ -106,17 +106,17 @@ _extract_fm_field() {
 
 _resolve_source_repo() {
   # 1. Environment variable override
-  if [[ -n "${SKM_REPO:-}" ]]; then
-    if [[ -d "$SKM_REPO/skills" && -f "$SKM_REPO/library.json" ]]; then
-      echo "$SKM_REPO"
+  if [[ -n "${AKM_REPO:-}" ]]; then
+    if [[ -d "$AKM_REPO/skills" && -f "$AKM_REPO/library.json" ]]; then
+      echo "$AKM_REPO"
       return 0
     fi
-    echo -e "${RED}Error: SKM_REPO=$SKM_REPO is not a valid source repo${NC}" >&2
+    echo -e "${RED}Error: AKM_REPO=$AKM_REPO is not a valid source repo${NC}" >&2
     return 1
   fi
 
   # 2. Config file
-  local config_file="${XDG_CONFIG_HOME:-$HOME/.config}/skm/config"
+  local config_file="${XDG_CONFIG_HOME:-$HOME/.config}/akm/config"
   if [[ -f "$config_file" ]]; then
     local repo_path
     repo_path="$(grep '^REPO=' "$config_file" | head -1 | cut -d'"' -f2)"
@@ -128,7 +128,7 @@ _resolve_source_repo() {
 
   # 3. Fail
   echo -e "${RED}Error: Cannot locate source repo.${NC}" >&2
-  echo -e "${DIM}Set SKM_REPO or run install.sh/sync.sh to write config.${NC}" >&2
+  echo -e "${DIM}Set AKM_REPO or run install.sh/sync.sh to write config.${NC}" >&2
   return 1
 }
 
@@ -139,7 +139,7 @@ _manifest_path() {
     echo ""
     return 1
   fi
-  echo "$root/.agents/skm.json"
+  echo "$root/.agents/akm.json"
 }
 
 _ensure_manifest() {
@@ -298,9 +298,9 @@ _format_type() {
 
 cmd_help() {
   cat <<'EOF'
-skm — Skill Kit Manager (SKM)
+akm — Agent Kit Manager (AKM)
 
-Usage: skm <subcommand> [options] [arguments]
+Usage: akm <subcommand> [options] [arguments]
 
 Global:
   sync            Rebuild core spec symlinks in global dirs
@@ -312,7 +312,7 @@ Global:
 
 Project:
   init            Initialize project dirs and manifest stub
-  add <id>        Add spec ID(s) to project manifest (.agents/skm.json)
+  add <id>        Add spec ID(s) to project manifest (.agents/akm.json)
   remove <id>     Remove spec ID(s) from project manifest
 
 Session:
@@ -339,16 +339,16 @@ Options:
 Global tool dirs: ~/.claude, ~/.copilot, ~/.agents, ~/.vibe
 
 Examples:
-  skm sync                    # rebuild global core symlinks
-  skm init                    # initialize project dirs + manifest
-  skm add vitest tdd          # add specs to project manifest
-  skm remove vitest           # remove spec from project manifest
-  skm load debugging          # load spec into active session
-  skm unload debugging        # unload spec from active session
-  skm loaded                  # show active session specs
-  skm clean --project         # clean stale project specs
-  skm list --type skill       # list all skills
-  skm libgen                  # regenerate library.json from disk
+  akm sync                    # rebuild global core symlinks
+  akm init                    # initialize project dirs + manifest
+  akm add vitest tdd          # add specs to project manifest
+  akm remove vitest           # remove spec from project manifest
+  akm load debugging          # load spec into active session
+  akm unload debugging        # unload spec from active session
+  akm loaded                  # show active session specs
+  akm clean --project         # clean stale project specs
+  akm list --type skill       # list all skills
+  akm libgen                  # regenerate library.json from disk
 EOF
 }
 
@@ -380,7 +380,7 @@ cmd_status() {
   echo ""
 
   # Session-loaded specs (staging dir)
-  local staging="${SKM_SESSION:-}"
+  local staging="${AKM_SESSION:-}"
   if [[ -n "$staging" && -d "$staging" ]]; then
     local session_lines=()
     for tool_subdir in .claude; do
@@ -450,13 +450,13 @@ cmd_status() {
       done < <(_read_manifest_ids "$manifest" "agent")
 
       if [[ ${#manifest_lines[@]} -gt 0 ]]; then
-        echo -e "${BOLD}Manifest specs (.agents/skm.json):${NC}"
+        echo -e "${BOLD}Manifest specs (.agents/akm.json):${NC}"
         for line in "${manifest_lines[@]}"; do
           echo -e "$line"
         done
         echo ""
       else
-        echo -e "${BOLD}Manifest specs (.agents/skm.json):${NC}"
+        echo -e "${BOLD}Manifest specs (.agents/akm.json):${NC}"
         echo -e "  ${DIM}(empty manifest)${NC}"
         echo ""
       fi
@@ -501,7 +501,7 @@ cmd_status() {
       for line in "${local_lines[@]}"; do
         echo -e "$line"
       done
-      echo -e "  ${DIM}Run 'skm clean --project --migrate' to convert to manifest-based loading${NC}"
+      echo -e "  ${DIM}Run 'akm clean --project --migrate' to convert to manifest-based loading${NC}"
       echo ""
     fi
   fi
@@ -568,7 +568,7 @@ cmd_search() {
 
   local query="${1:-}"
   if [[ -z "$query" ]]; then
-    echo -e "${RED}Usage: skm search <query>${NC}" >&2
+    echo -e "${RED}Usage: akm search <query>${NC}" >&2
     exit 1
   fi
 
@@ -601,7 +601,7 @@ cmd_add() {
   done
 
   if [[ ${#ids[@]} -eq 0 ]]; then
-    echo -e "${RED}Usage: skm add <spec-id> [spec-id...]${NC}" >&2
+    echo -e "${RED}Usage: akm add <spec-id> [spec-id...]${NC}" >&2
     exit 1
   fi
 
@@ -637,8 +637,8 @@ cmd_add() {
     echo -e "${GREEN}✓ Added to manifest: $id ($type)${NC}"
 
     # Auto-refresh staging if session is active
-    if [[ -n "${SKM_SESSION:-}" && -d "${SKM_SESSION:-}" ]]; then
-      _create_session_symlink "$id" "$SKM_SESSION" 2>/dev/null || true
+    if [[ -n "${AKM_SESSION:-}" && -d "${AKM_SESSION:-}" ]]; then
+      _create_session_symlink "$id" "$AKM_SESSION" 2>/dev/null || true
     fi
   done
 }
@@ -653,7 +653,7 @@ cmd_remove() {
   done
 
   if [[ ${#ids[@]} -eq 0 ]]; then
-    echo -e "${RED}Usage: skm remove <spec-id> [spec-id...]${NC}" >&2
+    echo -e "${RED}Usage: akm remove <spec-id> [spec-id...]${NC}" >&2
     exit 1
   fi
 
@@ -693,8 +693,8 @@ cmd_remove() {
         echo -e "${GREEN}✓ Removed from manifest: $id ($type)${NC}"
 
         # Auto-refresh staging if session is active
-        if [[ -n "${SKM_SESSION:-}" && -d "${SKM_SESSION:-}" ]]; then
-          _remove_session_symlink "$id" "$SKM_SESSION" 2>/dev/null || true
+        if [[ -n "${AKM_SESSION:-}" && -d "${AKM_SESSION:-}" ]]; then
+          _remove_session_symlink "$id" "$AKM_SESSION" 2>/dev/null || true
         fi
       else
         echo -e "${YELLOW}Warning: $id not found in manifest ${key} array${NC}" >&2
@@ -710,8 +710,8 @@ cmd_remove() {
           found=true
 
           # Auto-refresh staging if session is active
-          if [[ -n "${SKM_SESSION:-}" && -d "${SKM_SESSION:-}" ]]; then
-            _remove_session_symlink "$id" "$SKM_SESSION" 2>/dev/null || true
+          if [[ -n "${AKM_SESSION:-}" && -d "${AKM_SESSION:-}" ]]; then
+            _remove_session_symlink "$id" "$AKM_SESSION" 2>/dev/null || true
           fi
         fi
       done
@@ -748,7 +748,7 @@ cmd_sync() {
     # No source repo found — fall back to existing cold library if present
     if [[ ! -f "$LIBRARY_JSON" ]]; then
       echo -e "${RED}Error: No source repo and no existing cold library.${NC}" >&2
-      echo -e "${DIM}Run sync.sh first to bootstrap, or set SKM_REPO.${NC}" >&2
+      echo -e "${DIM}Run sync.sh first to bootstrap, or set AKM_REPO.${NC}" >&2
       exit 1
     fi
     if [[ "$quiet" == false ]]; then
@@ -811,7 +811,7 @@ cmd_init() {
 
   if [[ "$dry_run" == true ]]; then
     echo -e "${DIM}Would create .claude/, .github/, and .agents/ directories${NC}"
-    echo -e "${DIM}Would create AGENTS.md, CLAUDE.md, and .agents/skm.json if missing${NC}"
+    echo -e "${DIM}Would create AGENTS.md, CLAUDE.md, and .agents/akm.json if missing${NC}"
     return 0
   fi
 
@@ -823,11 +823,11 @@ cmd_init() {
 
   # Create .agents/ directory and manifest stub
   mkdir -p "$project_root/.agents"
-  if [[ ! -f "$project_root/.agents/skm.json" ]]; then
-    echo '{"skills":[],"agents":[]}' > "$project_root/.agents/skm.json"
-    echo -e "${GREEN}✓ Created .agents/skm.json manifest${NC}"
+  if [[ ! -f "$project_root/.agents/akm.json" ]]; then
+    echo '{"skills":[],"agents":[]}' > "$project_root/.agents/akm.json"
+    echo -e "${GREEN}✓ Created .agents/akm.json manifest${NC}"
   else
-    echo -e "${DIM}  .agents/skm.json already exists${NC}"
+    echo -e "${DIM}  .agents/akm.json already exists${NC}"
   fi
 
   # Create AGENTS.md if missing
@@ -846,7 +846,7 @@ cmd_init() {
     echo -e "${DIM}  CLAUDE.md already exists${NC}"
   fi
 
-  echo -e "\n${DIM}Use 'skm add <id>' to add specs to this project manifest.${NC}"
+  echo -e "\n${DIM}Use 'akm add <id>' to add specs to this project manifest.${NC}"
 }
 
 cmd_clean() {
@@ -982,7 +982,7 @@ cmd_load() {
   done
 
   if [[ ${#ids[@]} -eq 0 ]]; then
-    echo -e "${RED}Usage: skm load <spec-id> [spec-id...]${NC}" >&2
+    echo -e "${RED}Usage: akm load <spec-id> [spec-id...]${NC}" >&2
     exit 1
   fi
 
@@ -995,7 +995,7 @@ cmd_load() {
       continue
     fi
 
-    if ! _create_session_symlink "$id" "$SKM_SESSION"; then
+    if ! _create_session_symlink "$id" "$AKM_SESSION"; then
       echo -e "${RED}Failed to load: $id (source not found on disk)${NC}" >&2
       ((failures++)) || true
       continue
@@ -1020,12 +1020,12 @@ cmd_unload() {
   done
 
   if [[ ${#ids[@]} -eq 0 ]]; then
-    echo -e "${RED}Usage: skm unload <spec-id> [spec-id...]${NC}" >&2
+    echo -e "${RED}Usage: akm unload <spec-id> [spec-id...]${NC}" >&2
     exit 1
   fi
 
   for id in "${ids[@]}"; do
-    if ! _remove_session_symlink "$id" "$SKM_SESSION"; then
+    if ! _remove_session_symlink "$id" "$AKM_SESSION"; then
       echo -e "${YELLOW}Not loaded: $id${NC}" >&2
       continue
     fi
@@ -1039,7 +1039,7 @@ cmd_loaded() {
   _check_library
   _check_session
 
-  local staging="$SKM_SESSION"
+  local staging="$AKM_SESSION"
   local session_name
   session_name="$(basename "$staging")"
 
@@ -1047,7 +1047,7 @@ cmd_loaded() {
   local -A manifest_set
   local project_root
   project_root="$(_project_root)"
-  local manifest="${project_root:+$project_root/.agents/skm.json}"
+  local manifest="${project_root:+$project_root/.agents/akm.json}"
 
   if [[ -n "$manifest" && -f "$manifest" ]]; then
     local id
@@ -1138,7 +1138,7 @@ cmd_migrate() {
     if [[ -d "$skills_dir" ]]; then
       for entry in "$skills_dir"/*/; do
         [[ -d "$entry" ]] || continue
-        # Skip symlinks — those are core specs managed by skm sync
+        # Skip symlinks — those are core specs managed by akm sync
         [[ -L "${entry%/}" ]] && continue
 
         local id
@@ -1246,7 +1246,7 @@ cmd_migrate() {
 
   echo ""
   echo -e "${BOLD}Next steps:${NC}"
-  echo -e "  1. Review the manifest: ${DIM}cat .agents/skm.json${NC}"
+  echo -e "  1. Review the manifest: ${DIM}cat .agents/akm.json${NC}"
   echo -e "  2. Delete legacy copies (if satisfied):"
 
   local has_claude_skills=false has_claude_agents=false
@@ -1285,7 +1285,7 @@ cmd_migrate() {
     echo -e "     ${DIM}rm -rf ${rm_parts[*]}${NC}"
   fi
 
-  echo -e "  3. Commit the manifest: ${DIM}git add .agents/skm.json && git commit -m 'chore: migrate to manifest-based spec loading'${NC}"
+  echo -e "  3. Commit the manifest: ${DIM}git add .agents/akm.json && git commit -m 'chore: migrate to manifest-based spec loading'${NC}"
 }
 
 cmd_publish() {
@@ -1309,7 +1309,7 @@ cmd_publish() {
   done
 
   if [[ -z "$id" ]]; then
-    echo -e "${RED}Usage: skm publish <id> [--dry-run] [--force]${NC}" >&2
+    echo -e "${RED}Usage: akm publish <id> [--dry-run] [--force]${NC}" >&2
     exit 1
   fi
 
@@ -1461,7 +1461,7 @@ cmd_publish() {
   # Stash dirty state if any
   local had_stash=false
   if ! git -C "$source_repo" diff --quiet 2>/dev/null || ! git -C "$source_repo" diff --cached --quiet 2>/dev/null; then
-    git -C "$source_repo" stash push -m "skm publish: auto-stash" --quiet
+    git -C "$source_repo" stash push -m "akm publish: auto-stash" --quiet
     had_stash=true
   fi
 
@@ -1527,7 +1527,7 @@ EOF
 - **name:** $name
 - **description:** $desc
 
-Published from project $(_project_name) via \`skm publish\`.
+Published from project $(_project_name) via \`akm publish\`.
 EOF
     )" 2>/dev/null)" || true
 
@@ -1687,7 +1687,7 @@ main() {
     help|--help|-h) cmd_help ;;
     *)
       echo -e "${RED}Unknown subcommand: $subcommand${NC}" >&2
-      echo "Run 'skm help' for usage." >&2
+      echo "Run 'akm help' for usage." >&2
       exit 1
       ;;
   esac

@@ -1,10 +1,10 @@
 #!/bin/bash
-# skm-init.sh — Source this file in your .bashrc to enable SKM session lifecycle
+# akm-init.sh — Source this file in your .bashrc to enable AKM session lifecycle
 # and LLM tool wrappers (claude, copilot, opencode).
 #
 # Usage:
 #   # In your .bashrc (or sourced automatically by install.sh):
-#   source ~/.local/share/skm/shell/skm-init.sh
+#   source ~/.local/share/akm/shell/akm-init.sh
 
 # --- Tool helpers ---
 
@@ -16,7 +16,7 @@ _project_root() {
   git rev-parse --show-toplevel 2>/dev/null || true
 }
 
-_skm_repo_name() {
+_akm_repo_name() {
   basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || true
 }
 
@@ -24,10 +24,10 @@ _skm_repo_name() {
 
 # Create symlinks for a spec in the session staging directory.
 # Skills = directory symlinks, Agents = file symlinks.
-_skm_create_session_symlink() {
+_akm_create_session_symlink() {
   local id="$1"
   local staging="$2"
-  local library_dir="${XDG_DATA_HOME:-$HOME/.local/share}/skm"
+  local library_dir="${XDG_DATA_HOME:-$HOME/.local/share}/akm"
   local library_json="$library_dir/library.json"
 
   if [[ ! -f "$library_json" ]]; then
@@ -77,9 +77,9 @@ _skm_create_session_symlink() {
 }
 
 # Create a per-session staging directory and populate it from the project manifest.
-# Exports SKM_SESSION. Prints the staging dir path to stdout.
+# Exports AKM_SESSION. Prints the staging dir path to stdout.
 # Returns 1 if not in a git repo (caller should skip staging).
-_skm_session_start() {
+_akm_session_start() {
   local project_root
   project_root="$(_project_root)"
   if [[ -z "$project_root" ]]; then
@@ -87,9 +87,9 @@ _skm_session_start() {
   fi
 
   local project_name
-  project_name="$(_skm_repo_name)"
+  project_name="$(_akm_repo_name)"
   local session_id="${project_name:-anon}-$(date +%s)-$$"
-  local staging="$HOME/.cache/skm/$session_id"
+  local staging="$HOME/.cache/akm/$session_id"
 
   # Create staging directory structure for all tool dirs
   local tool_dir
@@ -98,34 +98,34 @@ _skm_session_start() {
   done
 
   # Layer 2: load specs from project manifest
-  local manifest="$project_root/.agents/skm.json"
+  local manifest="$project_root/.agents/akm.json"
 
   if [[ -f "$manifest" ]] && command -v jq &>/dev/null; then
     local id
     # Load skills from manifest
     while IFS= read -r id; do
       if [[ -n "$id" ]]; then
-        _skm_create_session_symlink "$id" "$staging" || true
+        _akm_create_session_symlink "$id" "$staging" || true
       fi
     done < <(jq -r '.skills // [] | .[]' "$manifest" 2>/dev/null)
 
     # Load agents from manifest
     while IFS= read -r id; do
       if [[ -n "$id" ]]; then
-        _skm_create_session_symlink "$id" "$staging" || true
+        _akm_create_session_symlink "$id" "$staging" || true
       fi
     done < <(jq -r '.agents // [] | .[]' "$manifest" 2>/dev/null)
   fi
 
-  export SKM_SESSION="$staging"
+  export AKM_SESSION="$staging"
 }
 
 # Remove the session staging directory and unset the env var.
-_skm_session_end() {
-  if [[ -n "${SKM_SESSION:-}" && -d "$SKM_SESSION" ]]; then
-    rm -rf "$SKM_SESSION"
+_akm_session_end() {
+  if [[ -n "${AKM_SESSION:-}" && -d "$AKM_SESSION" ]]; then
+    rm -rf "$AKM_SESSION"
   fi
-  unset SKM_SESSION
+  unset AKM_SESSION
 }
 
 # --- Tool wrappers ---
@@ -133,20 +133,20 @@ _skm_session_end() {
 #   1. Set up a per-session skills staging directory
 #   2. Clean up on exit
 
-_skm_wrap_tool() {
+_akm_wrap_tool() {
   local tool="$1"; shift
   local extra_args=()
   if _in_git_repo; then
-    _skm_session_start && extra_args+=(--add-dir "$SKM_SESSION")
+    _akm_session_start && extra_args+=(--add-dir "$AKM_SESSION")
   fi
 
   command "$tool" "${extra_args[@]}" "$@"
   local exit_code=$?
 
-  _skm_session_end
+  _akm_session_end
   return $exit_code
 }
 
-claude()   { _skm_wrap_tool claude   "$@"; }
-copilot()  { _skm_wrap_tool copilot  "$@"; }
-opencode() { _skm_wrap_tool opencode "$@"; }
+claude()   { _akm_wrap_tool claude   "$@"; }
+copilot()  { _akm_wrap_tool copilot  "$@"; }
+opencode() { _akm_wrap_tool opencode "$@"; }

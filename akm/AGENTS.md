@@ -4,7 +4,7 @@ This file provides guidance to LLMs working with code in this repository.
 
 ## What This Repo Is
 
-SKM (Skill Kit Manager) is a CLI tool and library for managing reusable
+AKM (Agent Kit Manager) is a CLI tool and library for managing reusable
 [Agent Skills](https://agentskills.io/) across LLM-powered coding assistants.
 
 It provides cold storage, three-layer activation (core → project → session),
@@ -14,9 +14,9 @@ and per-session isolation for skills and agents.
 
 ```bash
 bash install.sh    # One-time setup (jq, CLI, cold library, shell init)
-skm sync           # Re-sync cold library + core symlinks
-skm status         # Show what's active
-skm list           # Browse available skills
+akm sync           # Re-sync cold library + core symlinks
+akm status         # Show what's active
+akm list           # Browse available skills
 ```
 
 No build system, test suite, or CI/CD. All scripts are pure Bash.
@@ -24,9 +24,9 @@ No build system, test suite, or CI/CD. All scripts are pure Bash.
 ## Repository Map
 
 ```
-skm/
-├── bin/skm                # CLI (~1790 lines Bash, set -euo pipefail)
-├── shell/skm-init.sh      # Shell functions sourced in .bashrc
+akm/
+├── bin/akm                # CLI (~1790 lines Bash, set -euo pipefail)
+├── shell/akm-init.sh      # Shell functions sourced in .bashrc
 ├── skills/                # 65+ skills (SKILL.md + optional references/)
 ├── agents/                # Agent definitions (single .md files)
 ├── library.json           # Registry of all specs with metadata
@@ -40,8 +40,8 @@ skm/
 
 | File | Purpose |
 |------|---------|
-| `bin/skm` | Main CLI — all subcommands (sync, add, load, publish, etc.) |
-| `shell/skm-init.sh` | Session lifecycle + tool wrappers (claude, copilot, opencode) |
+| `bin/akm` | Main CLI — all subcommands (sync, add, load, publish, etc.) |
+| `shell/akm-init.sh` | Session lifecycle + tool wrappers (claude, copilot, opencode) |
 | `library.json` | Registry with id, type, description, tags, core flag per spec |
 | `install.sh` | Installs jq, copies CLI, writes config, syncs library |
 
@@ -51,19 +51,19 @@ skm/
 
 ```
 Layer 1 — Core (global, always available)
-  skm sync → cold library (~/.local/share/skm/) → global symlinks
+  akm sync → cold library (~/.local/share/akm/) → global symlinks
 
 Layer 2 — Project (manifest-declared, loaded at session start)
-  .agents/skm.json → shell wrapper reads → symlinks into staging dir
+  .agents/akm.json → shell wrapper reads → symlinks into staging dir
 
 Layer 3 — Session (JIT, mid-session)
-  skm load <id> / skm unload <id>
+  akm load <id> / akm unload <id>
 ```
 
 ### Cold Library
 
-`~/.local/share/skm/` mirrors the repo's `skills/` and `agents/` plus `library.json`.
-Core specs (`"core": true`) are symlinked into global tool dirs by `skm sync`.
+`~/.local/share/akm/` mirrors the repo's `skills/` and `agents/` plus `library.json`.
+Core specs (`"core": true`) are symlinked into global tool dirs by `akm sync`.
 
 ### Spec Types
 
@@ -72,7 +72,7 @@ Core specs (`"core": true`) are symlinked into global tool dirs by `skm sync`.
 | Skills | `skills/<name>/SKILL.md` | Directory with entry point + optional `references/` |
 | Agents | `agents/<name>.md` | Single markdown file |
 
-### `skm` CLI Subcommands
+### `akm` CLI Subcommands
 
 | Command | Description |
 |---------|-------------|
@@ -90,11 +90,11 @@ Core specs (`"core": true`) are symlinked into global tool dirs by `skm sync`.
 | `libgen` | Regenerate library.json from disk |
 | `publish <id>` | Publish project-local spec as PR |
 
-### Shell Init (`shell/skm-init.sh`)
+### Shell Init (`shell/akm-init.sh`)
 
 Defines `claude()`, `copilot()`, `opencode()` wrappers that:
-1. Create per-session staging dir (`~/.cache/skm/<project>-<ts>-<pid>/`)
-2. Populate from project manifest (`.agents/skm.json`)
+1. Create per-session staging dir (`~/.cache/akm/<project>-<ts>-<pid>/`)
+2. Populate from project manifest (`.agents/akm.json`)
 3. Pass `--add-dir` to the tool
 4. Clean up staging on exit
 
@@ -104,7 +104,7 @@ Defines `claude()`, `copilot()`, `opencode()` wrappers that:
 - `jq` is the sole runtime dependency
 - Skill frontmatter follows the [Agent Skills spec](https://agentskills.io/specification)
 - Commit style: conventional commits, WHY over WHAT
-- Adding new specs: create in `skills/` or `agents/` → run `skm libgen`
+- Adding new specs: create in `skills/` or `agents/` → run `akm libgen`
 
 ## Roadmap
 

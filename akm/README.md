@@ -1,12 +1,12 @@
-# SKM — Skill Kit Manager
+# AKM — Agent Kit Manager
 
 A CLI tool and library for managing reusable [Agent Skills](https://agentskills.io/) across LLM-powered coding assistants (Claude Code, GitHub Copilot CLI, OpenCode, and more).
 
-SKM provides **cold storage**, **three-layer activation**, and **session isolation** for skills and agents — so your LLM tools load exactly the right context for each project and session.
+AKM provides **cold storage**, **three-layer activation**, and **session isolation** for skills and agents — so your LLM tools load exactly the right context for each project and session.
 
 ## Features
 
-- **Cold library** — A single source of truth at `~/.local/share/skm/`, decoupled from any project
+- **Cold library** — A single source of truth at `~/.local/share/akm/`, decoupled from any project
 - **Three-layer activation** — Core (global), project (manifest), and session (JIT) loading
 - **Session isolation** — Per-session staging dirs prevent collisions between parallel sessions
 - **Code/skills separation** — Project manifests declare skill IDs only; no spec content committed to project repos
@@ -22,11 +22,11 @@ SKM provides **cold storage**, **three-layer activation**, and **session isolati
 
 ```bash
 # Clone and install
-git clone https://github.com/<org>/skm ~/skm
-bash ~/skm/install.sh    # installs CLI, syncs library, wires ~/.bashrc
+git clone https://github.com/<org>/akm ~/akm
+bash ~/akm/install.sh    # installs CLI, syncs library, wires ~/.bashrc
 
 # Open a new terminal (or source ~/.bashrc), then:
-skm status
+akm status
 ```
 
 ## How It Works
@@ -35,30 +35,30 @@ skm status
 
 ```
 Layer 1 — Core (global, always available)
-  skm sync → cold library (~/.local/share/skm/)
+  akm sync → cold library (~/.local/share/akm/)
            → symlinks into ~/.claude/, ~/.copilot/, ~/.agents/
 
 Layer 2 — Project (declared in manifest, loaded at session start)
-  .agents/skm.json lists skill/agent IDs
+  .agents/akm.json lists skill/agent IDs
   → shell wrapper reads manifest → symlinks into staging dir
 
 Layer 3 — Session (JIT, mid-session)
-  skm load <id>   → adds to active staging dir
-  skm unload <id> → removes from staging dir
+  akm load <id>   → adds to active staging dir
+  akm unload <id> → removes from staging dir
 ```
 
 ### Shell Wrappers
 
-When you source `skm-init.sh` (done automatically by `install.sh`), it provides wrapper functions for `claude`, `copilot`, and `opencode` that automatically:
+When you source `akm-init.sh` (done automatically by `install.sh`), it provides wrapper functions for `claude`, `copilot`, and `opencode` that automatically:
 1. Create a per-session staging directory
-2. Populate it from the project manifest (`.agents/skm.json`)
+2. Populate it from the project manifest (`.agents/akm.json`)
 3. Pass the staging dir to the tool via `--add-dir`
 4. Clean up on exit
 
 ## CLI Reference
 
 ```
-skm <subcommand> [options] [arguments]
+akm <subcommand> [options] [arguments]
 
 Global:
   sync            Rebuild core spec symlinks in global dirs
@@ -70,7 +70,7 @@ Global:
 
 Project:
   init            Initialize project dirs and manifest stub
-  add <id>        Add spec ID(s) to project manifest (.agents/skm.json)
+  add <id>        Add spec ID(s) to project manifest (.agents/akm.json)
   remove <id>     Remove spec ID(s) from project manifest
 
 Session:
@@ -92,7 +92,7 @@ Discovery:
 
 ## Included Skills
 
-SKM ships with 63 skills covering:
+AKM ships with 63 skills covering:
 
 | Category | Skills |
 |----------|--------|
@@ -103,7 +103,7 @@ SKM ships with 63 skills covering:
 | **Writing & docs** | technical-writer, editor, content-creator, adr-writing |
 | **Domain-specific** | R packages, Shiny, Quarto, Rust, Vitest, Supabase, and more |
 
-See `skm list` for the full inventory with descriptions.
+See `akm list` for the full inventory with descriptions.
 
 ## Skill Format
 
@@ -119,7 +119,7 @@ The YAML frontmatter requires `name` and `description` (starting with "Use when.
 
 ## Project Manifests
 
-Declare which skills a project uses in `.agents/skm.json`:
+Declare which skills a project uses in `.agents/akm.json`:
 
 ```json
 {
@@ -133,14 +133,14 @@ These are loaded automatically when you start a session via the shell wrappers.
 ## Machine Layout
 
 ```
-~/.local/bin/skm                    # CLI tool
-~/.local/share/skm/                 # Cold library (source of truth)
+~/.local/bin/akm                    # CLI tool
+~/.local/share/akm/                 # Cold library (source of truth)
   ├── skills/                       # All skills
   ├── agents/                       # All agents
   ├── library.json                  # Registry
-  └── shell/skm-init.sh            # Shell init script
-~/.config/skm/config                # REPO= path to source repo
-~/.cache/skm/                       # Ephemeral session staging dirs
+  └── shell/akm-init.sh            # Shell init script
+~/.config/akm/config                # REPO= path to source repo
+~/.cache/akm/                       # Ephemeral session staging dirs
 ```
 
 ## Third-Party Attributions
@@ -162,4 +162,4 @@ MIT — see [LICENSE](LICENSE).
 ## Related Projects
 
 - [Agent Skills Specification](https://agentskills.io/) — The open standard for portable AI coding skills
-- [`npx skills`](https://github.com/vercel-labs/skills) — Discover and import skills from GitHub (complementary to SKM)
+- [`npx skills`](https://github.com/vercel-labs/skills) — Discover and import skills from GitHub (complementary to AKM)
