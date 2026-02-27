@@ -11,7 +11,7 @@ Dispatch an implementation team to execute existing plans using TDD. A single Op
 
 - **mode**: `parallel` (default) or `sequential`
   - `parallel`: All tasks dispatched simultaneously, each in its own **git worktree** for true isolation. Sub-orchestrator merges branches after.
-  - `sequential`: Tasks dispatched one at a time. Each coder works in the tree left by the previous one. Use when tasks share files or build on each other.
+  - `sequential`: Tasks dispatched one at a time, each as a **separate, fresh agent**. Each coder works in the tree left by the previous one. Use when tasks share files or build on each other.
 
 Parse `mode` from `$ARGUMENTS`. If `$ARGUMENTS` contains `sequential`, set mode to sequential. Otherwise default to `parallel`.
 
@@ -30,7 +30,7 @@ Orchestrator (you — stays lean, never compacts)
 └── Phase 1: Delegate to Implementation Dispatch Sub-Orchestrator
     └── Opus sub-orchestrator (single Task agent)
         ├── Reads spec + plans
-        ├── Dispatches Opus Coder-Reviewer agents (one per task)
+        ├── Dispatches one NEW Opus Coder-Reviewer agent PER task
         │   ├── Implements with TDD (red → green → refactor)
         │   ├── Commits implementation
         │   ├── Dispatches Opus Reviewer (critical-code-reviewer methodology)
@@ -125,15 +125,48 @@ Read the spec file and all plan files. Extract per-task information: what to imp
 
 ### Step 2: Dispatch Coder-Reviewer Agents
 
-For each task, dispatch a **Task subagent** (`model: opus`, `subagent_type: general-purpose`) using the prompt template below.
+You will dispatch exactly **one NEW Task subagent per task** (`model: opus`, `subagent_type: general-purpose`). Each subagent runs the full coder-reviewer cycle for its assigned task ONLY. Each agent gets a fresh context — this is critical for code quality.
 
-**If mode is `parallel`**: dispatch ALL agents in a single response, each with `isolation: "worktree"`. Tasks get true file-system isolation — no conflict risk.
-**If mode is `sequential`**: dispatch one at a time. Wait for completion before dispatching the next. No worktree — each coder works in the current tree.
+**If mode is `parallel`**: Dispatch ALL agents in a **single response**, each with `isolation: "worktree"`. Each agent works in complete file-system isolation — no conflict risk.
+
+**If mode is `sequential`**: For EACH task, in order:
+  1. Dispatch ONE new Task subagent with the task-specific prompt below
+  2. Wait for it to complete and report back with status, files, tests, and decision log
+  3. Note any context from the completed task that the next agent needs (e.g., newly created files, function names, design decisions)
+  4. Dispatch a NEW Task subagent for the next task, including relevant context from prior tasks in its prompt
+
+**CRITICAL — BOTH MODES**: You dispatch a **separate, fresh agent** for each task. You do NOT implement tasks yourself. You do NOT ask a single agent to implement multiple tasks. Each agent gets ONE task, implements it, gets it reviewed, and reports back. This ensures each agent has a clean, focused context.
+
+#### Sequential Dispatch Example
+
+For sequential mode with 3 tasks, you do this:
+
+```
+# Task 1 — dispatch NEW agent
+Task(prompt="You are a coder-reviewer agent... Task: Task 1 ...", model=opus)
+→ Wait for completion → receive report
+
+# Task 2 — dispatch NEW agent (fresh context)
+Task(prompt="You are a coder-reviewer agent... Task: Task 2 ...
+  Prior context: Task 1 created R/foo.R with functions bar(), baz()...", model=opus)
+→ Wait for completion → receive report
+
+# Task 3 — dispatch NEW agent (fresh context)
+Task(prompt="You are a coder-reviewer agent... Task: Task 3 ...
+  Prior context: Tasks 1-2 created R/foo.R, R/qux.R ...", model=opus)
+→ Wait for completion → receive report
+
+# All done — merge/verify/push/PR
+```
+
+Each dispatch is a NEW independent agent. You NEVER continue implementation inside a single agent across multiple tasks.
 
 #### Coder-Reviewer Agent Prompt
 
 ```
-You are a coder-reviewer agent. Implement a task from an existing plan using strict TDD, get your work reviewed, and iterate until approved.
+You are a coder-reviewer agent. Implement ONE task from an existing plan using strict TDD, get your work reviewed, and iterate until approved.
+
+**SCOPE**: You will implement ONLY the task named "<TASK_NAME>" below. You will NOT implement any other tasks. When you have completed this ONE task (tests passing, reviewer approves), report back with your status. The orchestrator will dispatch a separate agent for the next task.
 
 ## Task: <TASK_NAME>
 
@@ -159,6 +192,10 @@ Read this for the full validated spec (design decisions, constraints, review cri
 The following criteria were co-created with the user. The reviewer will evaluate your code against them.
 
 <REVIEW_CRITERIA>
+
+## Prior Task Context (sequential mode only)
+
+<PRIOR_CONTEXT — files created by previous agents, key function names, decisions made. Empty for the first task.>
 
 ## Working Directory
 
@@ -364,6 +401,7 @@ While the sub-orchestrator works:
 - **Spec file guides implementation** — the spec from `/planning-team` contains validated design decisions and review criteria
 - **Review criteria build on the spec** — start from the user-approved criteria in the spec, augmented with skill and plan insights
 - **Implementation dispatch is delegated** — a sub-orchestrator manages all coder-reviewer agents; the main orchestrator stays lean
+- **One fresh agent per task** — every task gets a NEW Opus coder-reviewer agent with clean context. Never reuse an agent across tasks. The sub-orchestrator dispatches agents, it does NOT implement tasks itself.
 - **Coders and reviewers are Opus** — high-effort, maximum quality
 - **TDD is non-negotiable** — red → green → refactor, always
 - **Lean approach** — smallest code that works, no speculative features
@@ -377,5 +415,6 @@ While the sub-orchestrator works:
 - **Sub-orchestrator verifies** — always run tests before pushing
 - **Coders commit their work** — implementation commit + fix commits per review round, giving reviewers clean diffs
 - **Sequential preserves tree state** — each coder works in the tree the previous one left
+- **Sequential uses fresh agents** — each task gets a NEW agent dispatch via Task tool. Pass prior context (files created, key decisions) in the prompt, not by reusing the same agent.
 - **Orchestrator never compacts** — context discipline through delegation, not through reading everything yourself
 - **Skills are loaded, not passed** — use `specs-sync load <id>` to hotload skills; never pass absolute file paths to subagents

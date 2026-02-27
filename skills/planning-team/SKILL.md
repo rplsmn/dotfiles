@@ -11,7 +11,7 @@ Brainstorm interactively with the user to produce a validated spec, then dispatc
 
 - **mode**: `parallel` (default) or `sequential`
   - `parallel`: All plan-writing tasks dispatched simultaneously. Use when tasks are independent.
-  - `sequential`: Tasks dispatched one at a time. Each receives the previous task's plan as context. Use when tasks depend on each other.
+  - `sequential`: Tasks dispatched one at a time, each as a **separate, fresh agent**. Each receives the previous task's plan as context. Use when tasks depend on each other.
 
 Parse `mode` from `$ARGUMENTS`. If `$ARGUMENTS` contains `sequential`, set mode to sequential. Otherwise default to `parallel`.
 
@@ -34,7 +34,7 @@ Orchestrator (you — stays lean, never compacts)
 └── Phase 2: Delegate to Planning Dispatch Sub-Orchestrator
     └── Opus sub-orchestrator (single Task agent)
         ├── Reads spec file
-        ├── Dispatches Opus Planner-Reviewer agents (one per task)
+        ├── Dispatches one NEW Opus Planner-Reviewer agent PER task
         │   ├── Reads spec + source files, writes plan
         │   ├── Dispatches Opus Reviewer (critical-code-reviewer methodology)
         │   ├── Applies fixes, loops until READY (max 3 rounds)
@@ -159,15 +159,49 @@ Read the spec file thoroughly. Extract:
 
 ### Step 2: Dispatch Planner-Reviewer Agents
 
-For each task, dispatch a **Task subagent** (`model: opus`, `subagent_type: general-purpose`) using the prompt template below.
+You will dispatch exactly **one NEW Task subagent per task** (`model: opus`, `subagent_type: general-purpose`). Each subagent runs the full plan-review cycle for its assigned task ONLY. Each agent gets a fresh context — this is critical for plan quality.
 
-**If mode is `parallel`**: dispatch ALL task agents in a single response using parallel Task tool calls.
-**If mode is `sequential`**: dispatch one at a time. Wait for completion. Pass the previous task's plan file path as additional context to the next agent.
+**If mode is `parallel`**: Dispatch ALL task agents in a **single response** using parallel Task tool calls. Each agent works independently.
+
+**If mode is `sequential`**: For EACH task, in order:
+  1. Dispatch ONE new Task subagent with the task-specific prompt below
+  2. Wait for it to complete and report back with status, plan path, review verdict
+  3. Note the completed plan file path for context
+  4. Dispatch a NEW Task subagent for the next task, passing the previous task's plan file path as "Prior work"
+
+**CRITICAL — BOTH MODES**: You dispatch a **separate, fresh agent** for each task. You do NOT write plans yourself. You do NOT ask a single agent to write multiple plans. Each agent gets ONE task, writes its plan, gets it reviewed, and reports back. This ensures each agent has a clean, focused context.
+
+#### Sequential Dispatch Example
+
+For sequential mode with 3 tasks, you do this:
+
+```
+# Task 1 — dispatch NEW agent
+Task(prompt="You are a planner-reviewer agent... Task: Task 1 ...", model=opus)
+→ Wait for completion → receive report (plan file path, verdict)
+
+# Task 2 — dispatch NEW agent (fresh context)
+Task(prompt="You are a planner-reviewer agent... Task: Task 2 ...
+  Prior work: Task 1 plan at /path/to/task-1-plan.md ...", model=opus)
+→ Wait for completion → receive report
+
+# Task 3 — dispatch NEW agent (fresh context)
+Task(prompt="You are a planner-reviewer agent... Task: Task 3 ...
+  Prior work: Task 1 plan at /path/to/task-1-plan.md,
+              Task 2 plan at /path/to/task-2-plan.md ...", model=opus)
+→ Wait for completion → receive report
+
+# All done — report to orchestrator
+```
+
+Each dispatch is a NEW independent agent. You NEVER write multiple plans inside a single agent.
 
 #### Planner-Reviewer Agent Prompt
 
 ```
-You are a planner-reviewer agent. Write a detailed implementation plan, get it reviewed against the source code, and iterate until the reviewer approves.
+You are a planner-reviewer agent. Write a detailed implementation plan for ONE task, get it reviewed against the source code, and iterate until the reviewer approves.
+
+**SCOPE**: You will write a plan for ONLY the task named "<TASK_NAME>" below. You will NOT write plans for any other tasks. When you have completed this ONE plan (reviewer approves), report back with your status. The orchestrator will dispatch a separate agent for the next task.
 
 ## Task: <TASK_NAME>
 
@@ -196,6 +230,10 @@ You MUST read ALL of these files before writing the plan:
 ## Artifacts Directory
 
 <ARTIFACTS_DIR>
+
+## Prior Work (sequential mode only)
+
+<PRIOR_PLAN_PATHS — file paths of plans written by previous agents. Read these for context on what was already planned. Empty for the first task.>
 
 ## Your Workflow
 
@@ -328,6 +366,7 @@ While the sub-orchestrator works:
 - **Review criteria are co-created with the user** — presented explicitly, validated interactively, never silently assumed
 - **Spec is saved to ARTIFACTS_DIR** — the file is the single source of truth for all downstream work
 - **Plan dispatch is delegated** — a sub-orchestrator manages all planner-reviewer agents; the main orchestrator stays lean
+- **One fresh agent per task** — every task gets a NEW Opus planner-reviewer agent with clean context. Never reuse an agent across tasks. The sub-orchestrator dispatches agents, it does NOT write plans itself.
 - **Planners and reviewers are Opus** — thorough reasoning required
 - **Planner revises its own plan** — it has the context of WHY each decision was made
 - **Reviewer MUST read source code independently** — not just the plan
@@ -337,6 +376,6 @@ While the sub-orchestrator works:
 - **Orchestrator never compacts** — context discipline through delegation, not through reading everything yourself
 - **Final review persisted** — saved to disk alongside the plan for traceability
 - **Artifacts are permanent** — written to `~/.artifacts/<project>/plans/`, never ephemeral
-- **Sequential mode chains context** — each agent gets the previous task's plan path as "Prior work"
+- **Sequential uses fresh agents** — each task gets a NEW agent dispatch via Task tool. Pass prior plan paths in the prompt, not by reusing the same agent.
 - **Never start implementing** — this command produces plans only
 - **Skills are loaded, not passed** — use `specs-sync load <id>` to hotload skills; never pass absolute file paths to subagents
