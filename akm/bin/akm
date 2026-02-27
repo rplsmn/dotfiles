@@ -32,6 +32,55 @@ _check_deps() {
   fi
 }
 
+# Load config file into environment. Safe to call when config doesn't exist.
+_load_config() {
+  local config_file="${XDG_CONFIG_HOME:-$HOME/.config}/akm/config"
+  if [[ -f "$config_file" ]]; then
+    # shellcheck disable=SC1090
+    source "$config_file"
+  fi
+}
+
+# Check if a feature is enabled in FEATURES config.
+_feature_enabled() {
+  local feature="$1"
+  local features="${FEATURES:-}"
+  [[ ",$features," == *",$feature,"* ]]
+}
+
+# Write current config variables to disk. Idempotent.
+_write_config() {
+  local config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/akm"
+  local config_file="$config_dir/config"
+  mkdir -p "$config_dir"
+
+  cat > "$config_file" <<EOF
+FEATURES="${FEATURES:-}"
+SKILLS_REMOTE="${SKILLS_REMOTE:-}"
+ARTIFACTS_REMOTE="${ARTIFACTS_REMOTE:-}"
+ARTIFACTS_DIR="${ARTIFACTS_DIR:-$HOME/.akm/artifacts}"
+ARTIFACTS_AUTO_PUSH="${ARTIFACTS_AUTO_PUSH:-true}"
+EOF
+}
+
+# Idempotent bashrc integration. Uses marker blocks to replace on re-run.
+_patch_bashrc() {
+  local akm_marker_start="# >>> akm >>>"
+  local akm_marker_end="# <<< akm <<<"
+  local akm_init_path="\${XDG_DATA_HOME:-\$HOME/.local/share}/akm/shell/akm-init.sh"
+
+  if [[ -f "$HOME/.bashrc" ]]; then
+    # Remove existing block (idempotent)
+    sed -i "/${akm_marker_start}/,/${akm_marker_end}/d" "$HOME/.bashrc"
+  fi
+
+  {
+    echo "$akm_marker_start"
+    echo "[ -f \"$akm_init_path\" ] && source \"$akm_init_path\""
+    echo "$akm_marker_end"
+  } >> "$HOME/.bashrc"
+}
+
 _check_library() {
   if [[ ! -f "$LIBRARY_JSON" ]]; then
     echo -e "${RED}Error: Library not found at $LIBRARY_JSON${NC}" >&2
@@ -458,8 +507,205 @@ cmd_instructions_scaffold_project() {
 }
 
 cmd_setup() {
-  echo -e "${YELLOW}akm setup is not yet implemented.${NC}" >&2
-  exit 1
+  # Parse flags for scoped setup
+  local do_skills=false do_artifacts=false do_instructions=false
+  local scoped=false
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --skills)       do_skills=true; scoped=true; shift ;;
+      --artifacts)    do_artifacts=true; scoped=true; shift ;;
+      --instructions) do_instructions=true; scoped=true; shift ;;
+      *)
+        echo -e "${RED}Unknown option: $1${NC}" >&2
+        echo "Usage: akm setup [--skills] [--artifacts] [--instructions]" >&2
+        exit 1
+        ;;
+    esac
+  done
+
+  # If no scoped flags, do all
+  if [[ "$scoped" == false ]]; then
+    do_skills=true
+    do_artifacts=true
+    do_instructions=true
+  fi
+
+  # Load existing config (for defaults)
+  _load_config
+
+  # Build features list — start with existing
+  local -A enabled_features
+  local old_features="${FEATURES:-}"
+  local IFS=','
+  for f in $old_features; do
+    [[ -n "$f" ]] && enabled_features["$f"]=1
+  done
+  unset IFS
+
+  echo -e "${BOLD}AKM — Agent Kit Manager${NC}"
+  echo ""
+
+  # --- Skills ---
+  if [[ "$do_skills" == true ]]; then
+    echo -e "${BOLD}Skills management${NC} (cold library, session loading, project manifests)"
+
+    local skills_answer
+    read -rp "  Enable? [Y/n]: " skills_answer
+    skills_answer="${skills_answer:-Y}"
+
+    if [[ "$skills_answer" =~ ^[Yy]$ ]]; then
+      enabled_features["skills"]=1
+
+      local remote_default="${SKILLS_REMOTE:-}"
+      local remote_prompt="  Git remote URL for skills library"
+      if [[ -n "$remote_default" ]]; then
+        remote_prompt="$remote_prompt [$remote_default]"
+      else
+        remote_prompt="$remote_prompt (leave empty for empty library)"
+      fi
+      local skills_remote_input
+      read -rp "$remote_prompt: " skills_remote_input
+      SKILLS_REMOTE="${skills_remote_input:-$remote_default}"
+
+      echo -e "  ${GREEN}Skills enabled${NC}"
+    else
+      unset 'enabled_features[skills]'
+      echo -e "  ${DIM}Skills disabled${NC}"
+    fi
+    echo ""
+  fi
+
+  # --- Artifacts ---
+  if [[ "$do_artifacts" == true ]]; then
+    echo -e "${BOLD}Artifacts${NC} (auto-sync LLM session outputs to a git repo)"
+    local artifacts_answer
+    read -rp "  Enable? [Y/n]: " artifacts_answer
+    artifacts_answer="${artifacts_answer:-Y}"
+
+    if [[ "$artifacts_answer" =~ ^[Yy]$ ]]; then
+      enabled_features["artifacts"]=1
+
+      local remote_default="${ARTIFACTS_REMOTE:-}"
+      local remote_prompt="  Git remote URL (SSH or HTTPS)"
+      if [[ -n "$remote_default" ]]; then
+        remote_prompt="$remote_prompt [$remote_default]"
+      fi
+      local artifacts_remote_input
+      read -rp "$remote_prompt: " artifacts_remote_input
+      ARTIFACTS_REMOTE="${artifacts_remote_input:-$remote_default}"
+
+      if [[ -z "$ARTIFACTS_REMOTE" ]]; then
+        echo -e "  ${RED}Artifacts remote is required when artifacts is enabled.${NC}" >&2
+        unset 'enabled_features[artifacts]'
+        echo -e "  ${DIM}Artifacts disabled${NC}"
+        echo ""
+      else
+        local dir_default="${ARTIFACTS_DIR:-$HOME/.akm/artifacts}"
+        local artifacts_dir_input
+        read -rp "  Local directory [$dir_default]: " artifacts_dir_input
+        ARTIFACTS_DIR="${artifacts_dir_input:-$dir_default}"
+
+        local push_answer
+        read -rp "  Auto-push on session exit? [Y/n]: " push_answer
+        push_answer="${push_answer:-Y}"
+        if [[ "$push_answer" =~ ^[Yy]$ ]]; then
+          ARTIFACTS_AUTO_PUSH="true"
+        else
+          ARTIFACTS_AUTO_PUSH="false"
+        fi
+
+        echo -e "  ${GREEN}Artifacts enabled${NC}"
+        echo ""
+      fi
+    else
+      unset 'enabled_features[artifacts]'
+      echo -e "  ${DIM}Artifacts disabled${NC}"
+      echo ""
+    fi
+  fi
+
+  # --- Instructions ---
+  if [[ "$do_instructions" == true ]]; then
+    echo -e "${BOLD}Global instructions${NC} (distribute a shared instructions file to all LLM tools)"
+    local instructions_answer
+    read -rp "  Enable? [Y/n]: " instructions_answer
+    instructions_answer="${instructions_answer:-Y}"
+
+    if [[ "$instructions_answer" =~ ^[Yy]$ ]]; then
+      enabled_features["instructions"]=1
+
+      # Create empty global-instructions.md if it doesn't exist
+      local instructions_file="${XDG_DATA_HOME:-$HOME/.local/share}/akm/global-instructions.md"
+      if [[ ! -f "$instructions_file" ]]; then
+        mkdir -p "$(dirname "$instructions_file")"
+        touch "$instructions_file"
+        echo -e "  ${GREEN}Instructions enabled${NC}"
+        echo -e "  ${DIM}Created $instructions_file (empty — edit to customize)${NC}"
+      else
+        echo -e "  ${GREEN}Instructions enabled${NC}"
+        echo -e "  ${DIM}Instructions file exists at $instructions_file${NC}"
+      fi
+    else
+      unset 'enabled_features[instructions]'
+      echo -e "  ${DIM}Instructions disabled${NC}"
+    fi
+    echo ""
+  fi
+
+  # --- Write config ---
+  # Build FEATURES string from enabled_features map
+  FEATURES=""
+  for f in skills artifacts instructions; do
+    if [[ -n "${enabled_features[$f]+x}" ]]; then
+      if [[ -n "$FEATURES" ]]; then
+        FEATURES="$FEATURES,$f"
+      else
+        FEATURES="$f"
+      fi
+    fi
+  done
+
+  echo -e "Writing config to ~/.config/akm/config..."
+  _write_config
+  echo -e "${GREEN}Config saved${NC}"
+  echo ""
+
+  # --- Initial sync for enabled features ---
+  echo -e "Running initial sync..."
+
+  if [[ -n "${enabled_features[skills]+x}" ]]; then
+    if cmd_skills_sync --quiet 2>/dev/null; then
+      echo -e "  ${GREEN}Skills: cold library synced${NC}"
+    else
+      echo -e "  ${YELLOW}Skills: sync skipped (no remote configured or empty library)${NC}"
+    fi
+  fi
+
+  if [[ -n "${enabled_features[artifacts]+x}" ]]; then
+    if cmd_artifacts_sync 2>/dev/null; then
+      echo -e "  ${GREEN}Artifacts: synced to $ARTIFACTS_DIR${NC}"
+    else
+      echo -e "  ${YELLOW}Artifacts: sync failed (check remote URL and connection)${NC}"
+    fi
+  fi
+
+  if [[ -n "${enabled_features[instructions]+x}" ]]; then
+    if cmd_instructions_sync 2>/dev/null; then
+      echo -e "  ${GREEN}Instructions: distributed to tool directories${NC}"
+    else
+      echo -e "  ${YELLOW}Instructions: sync skipped${NC}"
+    fi
+  fi
+  echo ""
+
+  # --- Patch bashrc ---
+  echo "Patching ~/.bashrc..."
+  _patch_bashrc
+  echo -e "${GREEN}Shell integration installed${NC}"
+  echo ""
+
+  echo -e "Done! Open a new terminal or run: ${BOLD}source ~/.bashrc${NC}"
 }
 
 cmd_config() {
@@ -468,33 +714,27 @@ cmd_config() {
 }
 
 cmd_sync_all() {
-  local config_file="${XDG_CONFIG_HOME:-$HOME/.config}/akm/config"
-  local features=""
+  _load_config
 
-  if [[ -f "$config_file" ]]; then
-    # shellcheck disable=SC1090
-    source "$config_file"
-    features="${FEATURES:-}"
-  fi
-
+  local features="${FEATURES:-}"
   if [[ -z "$features" ]]; then
     echo -e "${YELLOW}No features configured. Run 'akm setup' first.${NC}" >&2
     exit 1
   fi
 
-  if [[ ",$features," == *",skills,"* ]]; then
+  if _feature_enabled "skills"; then
     echo -e "${BOLD}==> Skills${NC}"
     cmd_skills_sync "$@"
     echo ""
   fi
 
-  if [[ ",$features," == *",artifacts,"* ]]; then
+  if _feature_enabled "artifacts"; then
     echo -e "${BOLD}==> Artifacts${NC}"
     cmd_artifacts_sync "$@"
     echo ""
   fi
 
-  if [[ ",$features," == *",instructions,"* ]]; then
+  if _feature_enabled "instructions"; then
     echo -e "${BOLD}==> Instructions${NC}"
     cmd_instructions_sync "$@"
     echo ""
