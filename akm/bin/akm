@@ -538,13 +538,60 @@ cmd_instructions() {
 }
 
 cmd_instructions_sync() {
-  echo -e "${YELLOW}akm instructions sync is not yet implemented.${NC}" >&2
-  exit 1
+  local source_file="${XDG_DATA_HOME:-$HOME/.local/share}/akm/global-instructions.md"
+
+  if [[ ! -f "$source_file" ]]; then
+    echo -e "${YELLOW}Warning: No global instructions file found at $source_file${NC}" >&2
+    echo -e "${DIM}Run 'akm setup --instructions' to create one, or create it manually.${NC}" >&2
+    return 0
+  fi
+
+  # Target destinations: tool dir → filename
+  local -A targets=(
+    ["$HOME/.claude"]="CLAUDE.md"
+    ["$HOME/.copilot"]="copilot-instructions.md"
+    ["$HOME/.vibe/prompts"]="cli.md"
+    ["$HOME/.agents"]="AGENTS.md"
+  )
+
+  local count=0
+  for dir in "${!targets[@]}"; do
+    local filename="${targets[$dir]}"
+    local dest="$dir/$filename"
+    mkdir -p "$dir"
+    cp "$source_file" "$dest"
+    ((count++))
+  done
+
+  echo -e "${GREEN}Global instructions distributed to $count tool directories${NC}"
 }
 
 cmd_instructions_scaffold_project() {
-  echo -e "${YELLOW}akm instructions scaffold-project is not yet implemented.${NC}" >&2
-  exit 1
+  local project_root
+  project_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+
+  if [[ -z "$project_root" ]]; then
+    echo -e "${RED}Error: Not in a git repository.${NC}" >&2
+    exit 1
+  fi
+
+  echo -e "${BOLD}Scaffolding project instructions:${NC} $project_root"
+
+  # Create AGENTS.md if missing
+  if [[ ! -f "$project_root/AGENTS.md" ]]; then
+    echo "# Project LLM Instructions" > "$project_root/AGENTS.md"
+    echo -e "  ${GREEN}Created AGENTS.md${NC}"
+  else
+    echo -e "  ${DIM}AGENTS.md already exists${NC}"
+  fi
+
+  # Create CLAUDE.md if missing
+  if [[ ! -f "$project_root/CLAUDE.md" ]]; then
+    echo "LLM instructions live in @AGENTS.md" > "$project_root/CLAUDE.md"
+    echo -e "  ${GREEN}Created CLAUDE.md${NC}"
+  else
+    echo -e "  ${DIM}CLAUDE.md already exists${NC}"
+  fi
 }
 
 cmd_setup() {
