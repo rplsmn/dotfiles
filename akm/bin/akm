@@ -465,8 +465,49 @@ cmd_artifacts() {
 }
 
 cmd_artifacts_sync() {
-  echo -e "${YELLOW}akm artifacts sync is not yet implemented.${NC}" >&2
-  exit 1
+  _load_config
+
+  local remote="${ARTIFACTS_REMOTE:-}"
+  local dir="${ARTIFACTS_DIR:-$HOME/.akm/artifacts}"
+
+  if [[ -z "$remote" ]]; then
+    echo -e "${YELLOW}Warning: No artifacts remote configured. Run 'akm setup --artifacts' to configure.${NC}" >&2
+    return 0
+  fi
+
+  if [[ -d "$dir/.git" ]]; then
+    # Pull with rebase
+    local pull_output
+    if ! pull_output="$(git -C "$dir" pull --rebase --autostash 2>&1)"; then
+      echo -e "${YELLOW}Warning: Failed to pull artifacts from $remote. Check your connection or SSH keys.${NC}" >&2
+      echo -e "${DIM}$pull_output${NC}" >&2
+      return 0
+    fi
+    echo -e "${GREEN}Artifacts pulled${NC}"
+
+    # Push if local commits exist
+    local ahead
+    ahead="$(git -C "$dir" rev-list --count @{upstream}..HEAD 2>/dev/null || echo "0")"
+    if [[ "$ahead" -gt 0 ]]; then
+      local push_output
+      if ! push_output="$(git -C "$dir" push 2>&1)"; then
+        echo -e "${YELLOW}Warning: Failed to push artifacts to $remote. Check your connection or SSH keys.${NC}" >&2
+        echo -e "${DIM}$push_output${NC}" >&2
+        return 0
+      fi
+      echo -e "${GREEN}Artifacts pushed ($ahead commits)${NC}"
+    fi
+  else
+    # First-time clone
+    mkdir -p "$(dirname "$dir")"
+    local clone_output
+    if ! clone_output="$(git clone "$remote" "$dir" 2>&1)"; then
+      echo -e "${YELLOW}Warning: Failed to clone artifacts from $remote. Check the URL and your SSH keys.${NC}" >&2
+      echo -e "${DIM}$clone_output${NC}" >&2
+      return 0
+    fi
+    echo -e "${GREEN}Artifacts cloned to $dir${NC}"
+  fi
 }
 
 cmd_instructions() {
