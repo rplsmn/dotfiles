@@ -153,34 +153,6 @@ _extract_fm_field() {
   sed 's/\r$//' "$file" | sed -n '/^---$/,/^---$/p' | grep -m1 "^${field}:" | sed "s/^${field}:[[:space:]]*//; s/^[\"']//; s/[\"']$//" || true
 }
 
-_resolve_source_repo() {
-  # 1. Environment variable override
-  if [[ -n "${AKM_REPO:-}" ]]; then
-    if [[ -d "$AKM_REPO/skills" && -f "$AKM_REPO/library.json" ]]; then
-      echo "$AKM_REPO"
-      return 0
-    fi
-    echo -e "${RED}Error: AKM_REPO=$AKM_REPO is not a valid source repo${NC}" >&2
-    return 1
-  fi
-
-  # 2. Config file
-  local config_file="${XDG_CONFIG_HOME:-$HOME/.config}/akm/config"
-  if [[ -f "$config_file" ]]; then
-    local repo_path
-    repo_path="$(grep '^REPO=' "$config_file" | head -1 | cut -d'"' -f2)"
-    if [[ -n "$repo_path" && -d "$repo_path/skills" && -f "$repo_path/library.json" ]]; then
-      echo "$repo_path"
-      return 0
-    fi
-  fi
-
-  # 3. Fail
-  echo -e "${RED}Error: Cannot locate source repo.${NC}" >&2
-  echo -e "${DIM}Set AKM_REPO or run 'akm setup --skills' to configure.${NC}" >&2
-  return 1
-}
-
 _manifest_path() {
   local root
   root="$(_project_root)"
@@ -1289,8 +1261,88 @@ cmd_skills_remove() {
   done
 }
 
+# Run library.json generation for a specific directory.
+# Used by cmd_skills_sync to regenerate after copying from cache.
+_skills_libgen_for_dir() {
+  local target_dir="$1"
+  local quiet="${2:-false}"
+
+  local library_file="$target_dir/library.json"
+
+  # Load existing library.json — preserve ALL metadata for known specs
+  local -A existing_specs
+  if [[ -f "$library_file" ]]; then
+    while IFS= read -r spec_json; do
+      local eid
+      eid="$(echo "$spec_json" | jq -r '.id')"
+      existing_specs["$eid"]="$spec_json"
+    done < <(jq -c '.specs[]' "$library_file")
+  fi
+
+  local specs_json="[]"
+  local -A new_ids
+  local count=0
+
+  # Scan skills
+  if [[ -d "$target_dir/skills" ]]; then
+    for skill_dir in "$target_dir/skills"/*/; do
+      [[ -d "$skill_dir" ]] || continue
+      local id
+      id="$(basename "$skill_dir")"
+      local md_file="$skill_dir/SKILL.md"
+      [[ -f "$md_file" ]] || continue
+
+      new_ids["$id"]=1
+      ((count++)) || true
+
+      if [[ -n "${existing_specs[$id]+x}" ]]; then
+        specs_json=$(echo "$specs_json" | jq --argjson spec "${existing_specs[$id]}" '. + [$spec]')
+      else
+        local name desc
+        name="$(_extract_fm_field "$md_file" "name")"
+        desc="$(_extract_fm_field "$md_file" "description")"
+        [[ -z "$name" ]] && name="$id"
+        [[ -z "$desc" ]] && desc=""
+        specs_json=$(echo "$specs_json" | jq \
+          --arg id "$id" --arg type "skill" --arg name "$name" --arg desc "$desc" \
+          '. + [{"id":$id,"type":$type,"name":$name,"description":$desc,"core":false,"tags":[],"triggers":{}}]')
+      fi
+    done
+  fi
+
+  # Scan agents
+  if [[ -d "$target_dir/agents" ]]; then
+    for md_file in "$target_dir/agents"/*.md; do
+      [[ -f "$md_file" ]] || continue
+      local id
+      id="$(basename "$md_file" .md)"
+      new_ids["$id"]=1
+      ((count++)) || true
+
+      if [[ -n "${existing_specs[$id]+x}" ]]; then
+        specs_json=$(echo "$specs_json" | jq --argjson spec "${existing_specs[$id]}" '. + [$spec]')
+      else
+        local name desc
+        name="$(_extract_fm_field "$md_file" "name")"
+        desc="$(_extract_fm_field "$md_file" "description")"
+        [[ -z "$name" ]] && name="$id"
+        [[ -z "$desc" ]] && desc=""
+        specs_json=$(echo "$specs_json" | jq \
+          --arg id "$id" --arg type "agent" --arg name "$name" --arg desc "$desc" \
+          '. + [{"id":$id,"type":$type,"name":$name,"description":$desc,"core":false,"tags":[],"triggers":{}}]')
+      fi
+    done
+  fi
+
+  # Write library.json
+  echo "$specs_json" | jq '{version: 1, specs: .}' > "$library_file"
+
+  [[ "$quiet" == false ]] && echo -e "${GREEN}Library regenerated ($count specs)${NC}"
+}
+
 cmd_skills_sync() {
   _check_deps
+  _load_config
 
   local quiet=false
   while [[ $# -gt 0 ]]; do
@@ -1300,30 +1352,79 @@ cmd_skills_sync() {
     esac
   done
 
-  # --- Step 1: Update cold library from source repo ---
-  local source_repo
-  if source_repo="$(_resolve_source_repo 2>/dev/null)"; then
-    mkdir -p "$LIBRARY_DIR"
-    rm -rf "$LIBRARY_DIR/skills" "$LIBRARY_DIR/agents"
-    cp -r "$source_repo/skills" "$LIBRARY_DIR/"
-    cp -r "$source_repo/agents" "$LIBRARY_DIR/"
-    cp "$source_repo/library.json" "$LIBRARY_DIR/"
-    if [[ "$quiet" == false ]]; then
-      echo -e "${GREEN}✓ Cold library updated from $source_repo${NC}"
+  local remote="${SKILLS_REMOTE:-}"
+  local cache_dir="$HOME/.cache/akm/skills-remote"
+
+  # --- Step 1: Sync remote to cache ---
+  if [[ -n "$remote" ]]; then
+    if [[ -d "$cache_dir/.git" ]]; then
+      # Pull latest
+      local pull_output
+      if ! pull_output="$(git -C "$cache_dir" pull --rebase --autostash --quiet 2>&1)"; then
+        echo -e "${YELLOW}Warning: Failed to pull skills remote: $remote. Check your connection or SSH keys.${NC}" >&2
+        [[ -n "$pull_output" ]] && echo -e "${DIM}$pull_output${NC}" >&2
+        echo -e "${DIM}Continuing with cached copy.${NC}" >&2
+      else
+        [[ "$quiet" == false ]] && echo -e "${GREEN}Skills remote updated${NC}"
+      fi
+    else
+      # First-time clone
+      mkdir -p "$(dirname "$cache_dir")"
+      local clone_output
+      if ! clone_output="$(git clone --quiet "$remote" "$cache_dir" 2>&1)"; then
+        echo -e "${YELLOW}Warning: Failed to clone skills remote: $remote. Check the URL and your SSH keys.${NC}" >&2
+        [[ -n "$clone_output" ]] && echo -e "${DIM}$clone_output${NC}" >&2
+        if [[ ! -f "$LIBRARY_JSON" ]]; then
+          echo -e "${RED}Error: No cached skills and no existing cold library. Cannot proceed.${NC}" >&2
+          return 1
+        fi
+        echo -e "${DIM}Continuing with existing cold library.${NC}" >&2
+      else
+        [[ "$quiet" == false ]] && echo -e "${GREEN}Skills remote cloned${NC}"
+      fi
     fi
   else
-    # No source repo found — fall back to existing cold library if present
-    if [[ ! -f "$LIBRARY_JSON" ]]; then
-      echo -e "${RED}Error: No source repo and no existing cold library.${NC}" >&2
-      echo -e "${DIM}Run 'akm setup --skills' to configure, or set AKM_REPO.${NC}" >&2
-      exit 1
-    fi
     if [[ "$quiet" == false ]]; then
-      echo -e "${YELLOW}Warning: Source repo not found. Rebuilding symlinks from existing cold library.${NC}" >&2
+      if [[ -f "$LIBRARY_JSON" ]]; then
+        echo -e "${DIM}No skills remote configured. Working with existing cold library.${NC}"
+      else
+        echo -e "${DIM}No skills remote configured and no existing cold library. Skipping skills sync.${NC}"
+        return 0
+      fi
     fi
   fi
 
-  # --- Step 2: Rebuild global symlinks from cold library ---
+  # --- Step 2: Copy from cache to cold library ---
+  if [[ -d "$cache_dir" ]]; then
+    mkdir -p "$LIBRARY_DIR"
+
+    if [[ -d "$cache_dir/skills" ]]; then
+      rm -rf "$LIBRARY_DIR/skills"
+      cp -r "$cache_dir/skills" "$LIBRARY_DIR/"
+    fi
+
+    if [[ -d "$cache_dir/agents" ]]; then
+      rm -rf "$LIBRARY_DIR/agents"
+      cp -r "$cache_dir/agents" "$LIBRARY_DIR/"
+    fi
+
+    if [[ -f "$cache_dir/library.json" ]]; then
+      cp "$cache_dir/library.json" "$LIBRARY_DIR/"
+    fi
+
+    [[ "$quiet" == false ]] && echo -e "${GREEN}Cold library updated from cache${NC}"
+  fi
+
+  # --- Step 3: Run libgen to ensure library.json is current ---
+  if [[ -d "$LIBRARY_DIR/skills" ]] || [[ -d "$LIBRARY_DIR/agents" ]]; then
+    _skills_libgen_for_dir "$LIBRARY_DIR" "$quiet"
+  fi
+
+  # --- Step 4: Rebuild global symlinks from cold library ---
+  if [[ ! -f "$LIBRARY_JSON" ]]; then
+    [[ "$quiet" == false ]] && echo -e "${DIM}No library.json found. Skipping symlink rebuild.${NC}"
+    return 0
+  fi
 
   # Clear existing symlinks in global tool dirs (only symlinks, not real files/dirs)
   for tool_dir in "${GLOBAL_TOOL_DIRS[@]}"; do
@@ -1344,15 +1445,11 @@ cmd_skills_sync() {
   done
 
   local count=0
-
-  # Symlink core specs into all global dirs
   while IFS= read -r id; do
     _create_symlink "$id" && ((count++)) || true
   done < <(_get_core_ids)
 
-  if [[ "$quiet" == false ]]; then
-    echo -e "${GREEN}✓ $count core symlinks created across ${#GLOBAL_TOOL_DIRS[@]} global tool directories${NC}"
-  fi
+  [[ "$quiet" == false ]] && echo -e "${GREEN}$count core symlinks created across ${#GLOBAL_TOOL_DIRS[@]} global tool directories${NC}"
 }
 
 
@@ -1820,9 +1917,13 @@ cmd_skills_publish() {
     exit 1
   fi
 
-  # --- Resolve source repo ---
-  local source_repo
-  source_repo="$(_resolve_source_repo)"
+  # --- Resolve source repo (cached clone) ---
+  local cache_dir="$HOME/.cache/akm/skills-remote"
+  if [[ ! -d "$cache_dir/.git" ]]; then
+    echo -e "${RED}Error: No skills remote cache found. Run 'akm skills sync' first.${NC}" >&2
+    exit 1
+  fi
+  local source_repo="$cache_dir"
 
   local library_file="$source_repo/library.json"
 
@@ -2060,116 +2161,28 @@ EOF
 cmd_skills_libgen() {
   _check_deps
 
-  # Locate repo root (from script location or git)
-  local repo_dir
-  repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-  if [[ ! -d "$repo_dir/skills" ]]; then
-    repo_dir="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  # Locate target dir: repo root if in a repo with skills/, otherwise cold library
+  local target_dir
+  target_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  if [[ ! -d "$target_dir/skills" ]]; then
+    target_dir="$(git rev-parse --show-toplevel 2>/dev/null || true)"
   fi
-  if [[ -z "$repo_dir" || ! -d "$repo_dir/skills" ]]; then
-    echo -e "${RED}Error: Cannot locate repo root with skills/ directory.${NC}" >&2
+  if [[ -z "$target_dir" || ! -d "$target_dir/skills" ]]; then
+    # Fall back to cold library
+    target_dir="$LIBRARY_DIR"
+  fi
+  if [[ ! -d "$target_dir/skills" && ! -d "$target_dir/agents" ]]; then
+    echo -e "${RED}Error: Cannot locate a directory with skills/ or agents/.${NC}" >&2
     exit 1
   fi
 
-  local library_file="$repo_dir/library.json"
+  _skills_libgen_for_dir "$target_dir" false
 
-  # Load existing library.json — preserve ALL metadata for known specs
-  local -A existing_specs
-  if [[ -f "$library_file" ]]; then
-    while IFS= read -r spec_json; do
-      local eid
-      eid="$(echo "$spec_json" | jq -r '.id')"
-      existing_specs["$eid"]="$spec_json"
-    done < <(jq -c '.specs[]' "$library_file")
-  fi
-
-  # Collect existing IDs for add/remove tracking
-  local -A old_ids
-  for oid in "${!existing_specs[@]}"; do
-    old_ids["$oid"]=1
-  done
-
-  local specs_json="[]"
-  local -A new_ids
-  local added=() removed=() preserved=()
-
-  # Scan skills (each is a directory with SKILL.md)
-  if [[ -d "$repo_dir/skills" ]]; then
-    for skill_dir in "$repo_dir/skills"/*/; do
-      [[ -d "$skill_dir" ]] || continue
-      local id
-      id="$(basename "$skill_dir")"
-      local md_file="$skill_dir/SKILL.md"
-      [[ -f "$md_file" ]] || continue
-
-      new_ids["$id"]=1
-
-      if [[ -n "${existing_specs[$id]+x}" ]]; then
-        specs_json=$(echo "$specs_json" | jq --argjson spec "${existing_specs[$id]}" '. + [$spec]')
-        preserved+=("$id")
-      else
-        local name desc
-        name="$(_extract_fm_field "$md_file" "name")"
-        desc="$(_extract_fm_field "$md_file" "description")"
-        [[ -z "$name" ]] && name="$id"
-        [[ -z "$desc" ]] && desc=""
-
-        specs_json=$(echo "$specs_json" | jq \
-          --arg id "$id" --arg type "skill" --arg name "$name" --arg desc "$desc" \
-          '. + [{"id":$id,"type":$type,"name":$name,"description":$desc,"core":false,"tags":[],"triggers":{}}]')
-        added+=("$id")
-      fi
-    done
-  fi
-
-  # Scan agents (each is a .md file)
-  if [[ -d "$repo_dir/agents" ]]; then
-    for md_file in "$repo_dir/agents"/*.md; do
-      [[ -f "$md_file" ]] || continue
-      local id
-      id="$(basename "$md_file" .md)"
-      new_ids["$id"]=1
-
-      if [[ -n "${existing_specs[$id]+x}" ]]; then
-        specs_json=$(echo "$specs_json" | jq --argjson spec "${existing_specs[$id]}" '. + [$spec]')
-        preserved+=("$id")
-      else
-        local name desc
-        name="$(_extract_fm_field "$md_file" "name")"
-        desc="$(_extract_fm_field "$md_file" "description")"
-        [[ -z "$name" ]] && name="$id"
-        [[ -z "$desc" ]] && desc=""
-
-        specs_json=$(echo "$specs_json" | jq \
-          --arg id "$id" --arg type "agent" --arg name "$name" --arg desc "$desc" \
-          '. + [{"id":$id,"type":$type,"name":$name,"description":$desc,"core":false,"tags":[],"triggers":{}}]')
-        added+=("$id")
-      fi
-    done
-  fi
-
-  # Detect removed specs
-  for oid in "${!old_ids[@]}"; do
-    if [[ -z "${new_ids[$oid]+x}" ]]; then
-      removed+=("$oid")
-    fi
-  done
-
-  # Write library.json
-  echo "$specs_json" | jq '{version: 1, specs: .}' > "$library_file"
-
-  # Report
-  echo -e "${GREEN}✓ Generated $library_file${NC}"
-  echo -e "  Specs on disk: ${#new_ids[@]}"
-  if [[ ${#added[@]} -gt 0 ]]; then
-    echo -e "  ${GREEN}Added (${#added[@]}):${NC} ${added[*]}"
-  fi
-  if [[ ${#removed[@]} -gt 0 ]]; then
-    echo -e "  ${YELLOW}Removed (${#removed[@]}):${NC} ${removed[*]}"
-  fi
-  if [[ ${#preserved[@]} -gt 0 ]]; then
-    echo -e "  ${DIM}Preserved metadata (${#preserved[@]}):${NC} ${preserved[*]}"
-  fi
+  # Detailed report
+  local library_file="$target_dir/library.json"
+  local count
+  count="$(jq '.specs | length' "$library_file")"
+  echo -e "  Specs on disk: $count"
 }
 
 # --- Main ---
