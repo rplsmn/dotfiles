@@ -32,10 +32,59 @@ _check_deps() {
   fi
 }
 
+# Load config file into environment. Safe to call when config doesn't exist.
+_load_config() {
+  local config_file="${XDG_CONFIG_HOME:-$HOME/.config}/akm/config"
+  if [[ -f "$config_file" ]]; then
+    # shellcheck disable=SC1090
+    source "$config_file"
+  fi
+}
+
+# Check if a feature is enabled in FEATURES config.
+_feature_enabled() {
+  local feature="$1"
+  local features="${FEATURES:-}"
+  [[ ",$features," == *",$feature,"* ]]
+}
+
+# Write current config variables to disk. Idempotent.
+_write_config() {
+  local config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/akm"
+  local config_file="$config_dir/config"
+  mkdir -p "$config_dir"
+
+  cat > "$config_file" <<EOF
+FEATURES="${FEATURES:-}"
+SKILLS_REMOTE="${SKILLS_REMOTE:-}"
+ARTIFACTS_REMOTE="${ARTIFACTS_REMOTE:-}"
+ARTIFACTS_DIR="${ARTIFACTS_DIR:-$HOME/.akm/artifacts}"
+ARTIFACTS_AUTO_PUSH="${ARTIFACTS_AUTO_PUSH:-true}"
+EOF
+}
+
+# Idempotent bashrc integration. Uses marker blocks to replace on re-run.
+_patch_bashrc() {
+  local akm_marker_start="# >>> akm >>>"
+  local akm_marker_end="# <<< akm <<<"
+  local akm_init_path="\${XDG_DATA_HOME:-\$HOME/.local/share}/akm/shell/akm-init.sh"
+
+  if [[ -f "$HOME/.bashrc" ]]; then
+    # Remove existing block (idempotent)
+    sed -i "/${akm_marker_start}/,/${akm_marker_end}/d" "$HOME/.bashrc"
+  fi
+
+  {
+    echo "$akm_marker_start"
+    echo "[ -f \"$akm_init_path\" ] && source \"$akm_init_path\""
+    echo "$akm_marker_end"
+  } >> "$HOME/.bashrc"
+}
+
 _check_library() {
   if [[ ! -f "$LIBRARY_JSON" ]]; then
     echo -e "${RED}Error: Library not found at $LIBRARY_JSON${NC}" >&2
-    echo -e "${DIM}Run sync.sh to populate the library.${NC}" >&2
+    echo -e "${DIM}Run 'akm skills sync' to populate the library.${NC}" >&2
     exit 1
   fi
 }
@@ -102,34 +151,6 @@ _spec_source_path() {
 _extract_fm_field() {
   local file="$1" field="$2"
   sed 's/\r$//' "$file" | sed -n '/^---$/,/^---$/p' | grep -m1 "^${field}:" | sed "s/^${field}:[[:space:]]*//; s/^[\"']//; s/[\"']$//" || true
-}
-
-_resolve_source_repo() {
-  # 1. Environment variable override
-  if [[ -n "${AKM_REPO:-}" ]]; then
-    if [[ -d "$AKM_REPO/skills" && -f "$AKM_REPO/library.json" ]]; then
-      echo "$AKM_REPO"
-      return 0
-    fi
-    echo -e "${RED}Error: AKM_REPO=$AKM_REPO is not a valid source repo${NC}" >&2
-    return 1
-  fi
-
-  # 2. Config file
-  local config_file="${XDG_CONFIG_HOME:-$HOME/.config}/akm/config"
-  if [[ -f "$config_file" ]]; then
-    local repo_path
-    repo_path="$(grep '^REPO=' "$config_file" | head -1 | cut -d'"' -f2)"
-    if [[ -n "$repo_path" && -d "$repo_path/skills" && -f "$repo_path/library.json" ]]; then
-      echo "$repo_path"
-      return 0
-    fi
-  fi
-
-  # 3. Fail
-  echo -e "${RED}Error: Cannot locate source repo.${NC}" >&2
-  echo -e "${DIM}Set AKM_REPO or run install.sh/sync.sh to write config.${NC}" >&2
-  return 1
 }
 
 _manifest_path() {
@@ -298,61 +319,579 @@ _format_type() {
 
 cmd_help() {
   cat <<'EOF'
-akm — Agent Kit Manager (AKM)
+akm — Agent Kit Manager
 
-Usage: akm <subcommand> [options] [arguments]
+Usage: akm <command> [subcommand] [options]
 
-Global:
-  sync            Rebuild core spec symlinks in global dirs
-  clean           Remove stale specs from global dirs or project dirs
-    --project       Clean project dirs instead of global
-    --migrate       (with --project) Migrate legacy copies to manifest first
-    --dry-run       Show what would happen without making changes
-  status          Show core, session, manifest, and available specs (default)
+Setup & Config:
+  setup                          Interactive feature configuration
+    --skills                     Configure skills only
+    --artifacts                  Configure artifacts only
+    --instructions               Configure instructions only
+  config <key> [value]           Get or set a config value
+  sync                           Sync all enabled subsystems
+  help                           Show this help message
 
-Project:
-  init            Initialize project dirs and manifest stub
-  add <id>        Add spec ID(s) to project manifest (.agents/akm.json)
-  remove <id>     Remove spec ID(s) from project manifest
+Skills:
+  skills sync                    Pull remote → cold library → rebuild symlinks
+  skills add <id> [id...]        Add spec ID(s) to project manifest
+  skills remove <id> [id...]     Remove spec ID(s) from project manifest
+  skills load <id> [id...]       Load spec into active session (JIT)
+  skills unload <id> [id...]     Remove spec from active session
+  skills loaded                  Show specs in active session
+  skills list [--tag TAG] [--type TYPE]  List library
+  skills search <query>          Search library by keyword
+  skills status                  Show core, session, manifest, and cold specs
+  skills clean [--project]       Remove stale specs
+  skills publish <id>            Publish local spec to source repo as PR
+  skills libgen                  Regenerate library.json from disk
 
-Session:
-  load <id>       Symlink spec into active staging dir (JIT loading)
-  unload <id>     Remove spec from active staging dir
-  loaded          Show specs loaded in active session
+Artifacts:
+  artifacts sync                 Bidirectional sync with artifacts remote
 
-Publishing:
-  publish <id>    Publish a local spec to the source repo as a PR
-    --dry-run       Show what would happen without making changes
-    --force         Overwrite if spec already exists in source repo
+Instructions:
+  instructions sync              Distribute global instructions to tool dirs
+  instructions scaffold-project  Create AGENTS.md + CLAUDE.md in project root
 
-Discovery:
-  list            List all specs in the library
-  search <query>  Search specs by keyword or tag
-  libgen          Auto-generate library.json from disk contents
-  help            Show this help message
-
-Options:
-  --tag TAG       Filter by tag (list subcommand)
-  --type TYPE     Filter by type: skill, agent (list subcommand)
-  --quiet         Suppress output (sync subcommand)
+Config keys:
+  artifacts.auto-push            Auto commit+push artifacts on session exit (true|false)
 
 Global tool dirs: ~/.claude, ~/.copilot, ~/.agents, ~/.vibe
 
 Examples:
-  akm sync                    # rebuild global core symlinks
-  akm init                    # initialize project dirs + manifest
-  akm add vitest tdd          # add specs to project manifest
-  akm remove vitest           # remove spec from project manifest
-  akm load debugging          # load spec into active session
-  akm unload debugging        # unload spec from active session
-  akm loaded                  # show active session specs
-  akm clean --project         # clean stale project specs
-  akm list --type skill       # list all skills
-  akm libgen                  # regenerate library.json from disk
+  akm setup                      # interactive feature configuration
+  akm sync                       # sync all enabled features
+  akm skills add vitest tdd      # add specs to project manifest
+  akm skills load debugging      # load spec into active session
+  akm skills list --type skill   # list all skills
+  akm artifacts sync             # sync artifacts repo
+  akm config artifacts.auto-push false
 EOF
 }
 
-cmd_status() {
+cmd_skills() {
+  local subcommand="${1:-status}"
+  shift 2>/dev/null || true
+
+  case "$subcommand" in
+    sync)       cmd_skills_sync "$@" ;;
+    add)        cmd_skills_add "$@" ;;
+    remove)     cmd_skills_remove "$@" ;;
+    load)       cmd_skills_load "$@" ;;
+    unload)     cmd_skills_unload "$@" ;;
+    loaded)     cmd_skills_loaded "$@" ;;
+    list)       cmd_skills_list "$@" ;;
+    search)     cmd_skills_search "$@" ;;
+    status)     cmd_skills_status "$@" ;;
+    clean)      cmd_skills_clean "$@" ;;
+    publish)    cmd_skills_publish "$@" ;;
+    libgen)     cmd_skills_libgen "$@" ;;
+    help|--help|-h)
+      echo "Usage: akm skills <subcommand>"
+      echo ""
+      echo "Subcommands:"
+      echo "  sync              Pull remote, rebuild cold library and symlinks"
+      echo "  add <id>          Add spec to project manifest"
+      echo "  remove <id>       Remove spec from project manifest"
+      echo "  load <id>         Load spec into active session"
+      echo "  unload <id>       Remove spec from active session"
+      echo "  loaded            Show active session specs"
+      echo "  list              List library (--tag TAG, --type TYPE)"
+      echo "  search <query>    Search by keyword"
+      echo "  status            Full status view (default)"
+      echo "  clean             Remove stale specs (--project)"
+      echo "  publish <id>      Publish local spec as PR"
+      echo "  libgen            Regenerate library.json"
+      ;;
+    *)
+      echo -e "${RED}Unknown skills subcommand: $subcommand${NC}" >&2
+      echo "Run 'akm skills help' for usage." >&2
+      exit 1
+      ;;
+  esac
+}
+
+cmd_artifacts() {
+  local subcommand="${1:-}"
+  shift 2>/dev/null || true
+
+  case "$subcommand" in
+    sync)   cmd_artifacts_sync "$@" ;;
+    help|--help|-h)
+      echo "Usage: akm artifacts <subcommand>"
+      echo ""
+      echo "Subcommands:"
+      echo "  sync    Bidirectional sync with artifacts remote"
+      ;;
+    "")
+      echo -e "${RED}Usage: akm artifacts <subcommand>${NC}" >&2
+      echo "Run 'akm artifacts help' for available subcommands." >&2
+      exit 1
+      ;;
+    *)
+      echo -e "${RED}Unknown artifacts subcommand: $subcommand${NC}" >&2
+      echo "Run 'akm artifacts help' for usage." >&2
+      exit 1
+      ;;
+  esac
+}
+
+cmd_artifacts_sync() {
+  _load_config
+
+  local remote="${ARTIFACTS_REMOTE:-}"
+  local dir="${ARTIFACTS_DIR:-$HOME/.akm/artifacts}"
+
+  if [[ -z "$remote" ]]; then
+    echo -e "${YELLOW}Warning: No artifacts remote configured. Run 'akm setup --artifacts' to configure.${NC}" >&2
+    return 0
+  fi
+
+  if [[ -d "$dir/.git" ]]; then
+    # Pull with rebase
+    local pull_output
+    if ! pull_output="$(git -C "$dir" pull --rebase --autostash 2>&1)"; then
+      echo -e "${YELLOW}Warning: Failed to pull artifacts from $remote. Check your connection or SSH keys.${NC}" >&2
+      echo -e "${DIM}$pull_output${NC}" >&2
+      return 0
+    fi
+    echo -e "${GREEN}Artifacts pulled${NC}"
+
+    # Push if local commits exist
+    local ahead
+    ahead="$(git -C "$dir" rev-list --count @{upstream}..HEAD 2>/dev/null || echo "0")"
+    if [[ "$ahead" -gt 0 ]]; then
+      local push_output
+      if ! push_output="$(git -C "$dir" push 2>&1)"; then
+        echo -e "${YELLOW}Warning: Failed to push artifacts to $remote. Check your connection or SSH keys.${NC}" >&2
+        echo -e "${DIM}$push_output${NC}" >&2
+        return 0
+      fi
+      echo -e "${GREEN}Artifacts pushed ($ahead commits)${NC}"
+    fi
+  else
+    # First-time clone
+    mkdir -p "$(dirname "$dir")"
+    local clone_output
+    if ! clone_output="$(git clone "$remote" "$dir" 2>&1)"; then
+      echo -e "${YELLOW}Warning: Failed to clone artifacts from $remote. Check the URL and your SSH keys.${NC}" >&2
+      echo -e "${DIM}$clone_output${NC}" >&2
+      return 0
+    fi
+    echo -e "${GREEN}Artifacts cloned to $dir${NC}"
+  fi
+}
+
+cmd_instructions() {
+  local subcommand="${1:-}"
+  shift 2>/dev/null || true
+
+  case "$subcommand" in
+    sync)             cmd_instructions_sync "$@" ;;
+    scaffold-project) cmd_instructions_scaffold_project "$@" ;;
+    help|--help|-h)
+      echo "Usage: akm instructions <subcommand>"
+      echo ""
+      echo "Subcommands:"
+      echo "  sync              Distribute global instructions to tool dirs"
+      echo "  scaffold-project  Create AGENTS.md + CLAUDE.md in project root"
+      ;;
+    "")
+      echo -e "${RED}Usage: akm instructions <subcommand>${NC}" >&2
+      echo "Run 'akm instructions help' for available subcommands." >&2
+      exit 1
+      ;;
+    *)
+      echo -e "${RED}Unknown instructions subcommand: $subcommand${NC}" >&2
+      echo "Run 'akm instructions help' for usage." >&2
+      exit 1
+      ;;
+  esac
+}
+
+cmd_instructions_sync() {
+  local source_file="${XDG_DATA_HOME:-$HOME/.local/share}/akm/global-instructions.md"
+
+  if [[ ! -f "$source_file" ]]; then
+    echo -e "${YELLOW}Warning: No global instructions file found at $source_file${NC}" >&2
+    echo -e "${DIM}Run 'akm setup --instructions' to create one, or create it manually.${NC}" >&2
+    return 0
+  fi
+
+  # Target destinations: tool dir → filename
+  local -A targets=(
+    ["$HOME/.claude"]="CLAUDE.md"
+    ["$HOME/.copilot"]="copilot-instructions.md"
+    ["$HOME/.vibe/prompts"]="cli.md"
+    ["$HOME/.agents"]="AGENTS.md"
+  )
+
+  local count=0
+  for dir in "${!targets[@]}"; do
+    local filename="${targets[$dir]}"
+    local dest="$dir/$filename"
+    mkdir -p "$dir"
+    cp "$source_file" "$dest"
+    ((count++))
+  done
+
+  echo -e "${GREEN}Global instructions distributed to $count tool directories${NC}"
+}
+
+cmd_instructions_scaffold_project() {
+  local project_root
+  project_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+
+  if [[ -z "$project_root" ]]; then
+    echo -e "${RED}Error: Not in a git repository.${NC}" >&2
+    exit 1
+  fi
+
+  echo -e "${BOLD}Scaffolding project instructions:${NC} $project_root"
+
+  # Create AGENTS.md if missing
+  if [[ ! -f "$project_root/AGENTS.md" ]]; then
+    echo "# Project LLM Instructions" > "$project_root/AGENTS.md"
+    echo -e "  ${GREEN}Created AGENTS.md${NC}"
+  else
+    echo -e "  ${DIM}AGENTS.md already exists${NC}"
+  fi
+
+  # Create CLAUDE.md if missing
+  if [[ ! -f "$project_root/CLAUDE.md" ]]; then
+    echo "LLM instructions live in @AGENTS.md" > "$project_root/CLAUDE.md"
+    echo -e "  ${GREEN}Created CLAUDE.md${NC}"
+  else
+    echo -e "  ${DIM}CLAUDE.md already exists${NC}"
+  fi
+}
+
+cmd_setup() {
+  # Parse flags for scoped setup
+  local do_skills=false do_artifacts=false do_instructions=false
+  local scoped=false
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --skills)       do_skills=true; scoped=true; shift ;;
+      --artifacts)    do_artifacts=true; scoped=true; shift ;;
+      --instructions) do_instructions=true; scoped=true; shift ;;
+      *)
+        echo -e "${RED}Unknown option: $1${NC}" >&2
+        echo "Usage: akm setup [--skills] [--artifacts] [--instructions]" >&2
+        exit 1
+        ;;
+    esac
+  done
+
+  # If no scoped flags, do all
+  if [[ "$scoped" == false ]]; then
+    do_skills=true
+    do_artifacts=true
+    do_instructions=true
+  fi
+
+  # Load existing config (for defaults)
+  _load_config
+
+  # Build features list — start with existing
+  local -A enabled_features
+  local old_features="${FEATURES:-}"
+  local IFS=','
+  for f in $old_features; do
+    [[ -n "$f" ]] && enabled_features["$f"]=1
+  done
+  unset IFS
+
+  echo -e "${BOLD}AKM — Agent Kit Manager${NC}"
+  echo ""
+
+  # --- Skills ---
+  if [[ "$do_skills" == true ]]; then
+    echo -e "${BOLD}Skills management${NC} (cold library, session loading, project manifests)"
+
+    local skills_answer
+    read -rp "  Enable? [Y/n]: " skills_answer
+    skills_answer="${skills_answer:-Y}"
+
+    if [[ "$skills_answer" =~ ^[Yy]$ ]]; then
+      enabled_features["skills"]=1
+
+      local remote_default="${SKILLS_REMOTE:-}"
+      local remote_prompt="  Git remote URL for skills library"
+      if [[ -n "$remote_default" ]]; then
+        remote_prompt="$remote_prompt [$remote_default]"
+      else
+        remote_prompt="$remote_prompt (leave empty for empty library)"
+      fi
+      local skills_remote_input
+      read -rp "$remote_prompt: " skills_remote_input
+      SKILLS_REMOTE="${skills_remote_input:-$remote_default}"
+
+      echo -e "  ${GREEN}Skills enabled${NC}"
+    else
+      unset 'enabled_features[skills]'
+      echo -e "  ${DIM}Skills disabled${NC}"
+    fi
+    echo ""
+  fi
+
+  # --- Artifacts ---
+  if [[ "$do_artifacts" == true ]]; then
+    echo -e "${BOLD}Artifacts${NC} (auto-sync LLM session outputs to a git repo)"
+    local artifacts_answer
+    read -rp "  Enable? [Y/n]: " artifacts_answer
+    artifacts_answer="${artifacts_answer:-Y}"
+
+    if [[ "$artifacts_answer" =~ ^[Yy]$ ]]; then
+      enabled_features["artifacts"]=1
+
+      local remote_default="${ARTIFACTS_REMOTE:-}"
+      local remote_prompt="  Git remote URL (SSH or HTTPS)"
+      if [[ -n "$remote_default" ]]; then
+        remote_prompt="$remote_prompt [$remote_default]"
+      fi
+      local artifacts_remote_input
+      read -rp "$remote_prompt: " artifacts_remote_input
+      ARTIFACTS_REMOTE="${artifacts_remote_input:-$remote_default}"
+
+      if [[ -z "$ARTIFACTS_REMOTE" ]]; then
+        echo -e "  ${RED}Artifacts remote is required when artifacts is enabled.${NC}" >&2
+        unset 'enabled_features[artifacts]'
+        echo -e "  ${DIM}Artifacts disabled${NC}"
+        echo ""
+      else
+        local dir_default="${ARTIFACTS_DIR:-$HOME/.akm/artifacts}"
+        local artifacts_dir_input
+        read -rp "  Local directory [$dir_default]: " artifacts_dir_input
+        ARTIFACTS_DIR="${artifacts_dir_input:-$dir_default}"
+
+        local push_answer
+        read -rp "  Auto-push on session exit? [Y/n]: " push_answer
+        push_answer="${push_answer:-Y}"
+        if [[ "$push_answer" =~ ^[Yy]$ ]]; then
+          ARTIFACTS_AUTO_PUSH="true"
+        else
+          ARTIFACTS_AUTO_PUSH="false"
+        fi
+
+        echo -e "  ${GREEN}Artifacts enabled${NC}"
+        echo ""
+      fi
+    else
+      unset 'enabled_features[artifacts]'
+      echo -e "  ${DIM}Artifacts disabled${NC}"
+      echo ""
+    fi
+  fi
+
+  # --- Instructions ---
+  if [[ "$do_instructions" == true ]]; then
+    echo -e "${BOLD}Global instructions${NC} (distribute a shared instructions file to all LLM tools)"
+    local instructions_answer
+    read -rp "  Enable? [Y/n]: " instructions_answer
+    instructions_answer="${instructions_answer:-Y}"
+
+    if [[ "$instructions_answer" =~ ^[Yy]$ ]]; then
+      enabled_features["instructions"]=1
+
+      # Create empty global-instructions.md if it doesn't exist
+      local instructions_file="${XDG_DATA_HOME:-$HOME/.local/share}/akm/global-instructions.md"
+      if [[ ! -f "$instructions_file" ]]; then
+        mkdir -p "$(dirname "$instructions_file")"
+        touch "$instructions_file"
+        echo -e "  ${GREEN}Instructions enabled${NC}"
+        echo -e "  ${DIM}Created $instructions_file (empty — edit to customize)${NC}"
+      else
+        echo -e "  ${GREEN}Instructions enabled${NC}"
+        echo -e "  ${DIM}Instructions file exists at $instructions_file${NC}"
+      fi
+    else
+      unset 'enabled_features[instructions]'
+      echo -e "  ${DIM}Instructions disabled${NC}"
+    fi
+    echo ""
+  fi
+
+  # --- Write config ---
+  # Build FEATURES string from enabled_features map
+  FEATURES=""
+  for f in skills artifacts instructions; do
+    if [[ -n "${enabled_features[$f]+x}" ]]; then
+      if [[ -n "$FEATURES" ]]; then
+        FEATURES="$FEATURES,$f"
+      else
+        FEATURES="$f"
+      fi
+    fi
+  done
+
+  echo -e "Writing config to ~/.config/akm/config..."
+  _write_config
+  echo -e "${GREEN}Config saved${NC}"
+  echo ""
+
+  # --- Initial sync for enabled features ---
+  echo -e "Running initial sync..."
+
+  if [[ -n "${enabled_features[skills]+x}" ]]; then
+    if cmd_skills_sync --quiet 2>/dev/null; then
+      echo -e "  ${GREEN}Skills: cold library synced${NC}"
+    else
+      echo -e "  ${YELLOW}Skills: sync skipped (no remote configured or empty library)${NC}"
+    fi
+  fi
+
+  if [[ -n "${enabled_features[artifacts]+x}" ]]; then
+    if cmd_artifacts_sync 2>/dev/null; then
+      echo -e "  ${GREEN}Artifacts: synced to $ARTIFACTS_DIR${NC}"
+    else
+      echo -e "  ${YELLOW}Artifacts: sync failed (check remote URL and connection)${NC}"
+    fi
+  fi
+
+  if [[ -n "${enabled_features[instructions]+x}" ]]; then
+    if cmd_instructions_sync 2>/dev/null; then
+      echo -e "  ${GREEN}Instructions: distributed to tool directories${NC}"
+    else
+      echo -e "  ${YELLOW}Instructions: sync skipped${NC}"
+    fi
+  fi
+  echo ""
+
+  # --- Patch bashrc ---
+  echo "Patching ~/.bashrc..."
+  _patch_bashrc
+  echo -e "${GREEN}Shell integration installed${NC}"
+  echo ""
+
+  echo -e "Done! Open a new terminal or run: ${BOLD}source ~/.bashrc${NC}"
+}
+
+cmd_config() {
+  local key="${1:-}"
+  local value="${2:-}"
+  local has_value=false
+  [[ $# -ge 2 ]] && has_value=true
+
+  _load_config
+
+  # No args: print all config
+  if [[ -z "$key" ]]; then
+    _config_print_all
+    return 0
+  fi
+
+  # Map CLI key to config variable
+  local var_name
+  var_name="$(_config_key_to_var "$key")" || exit 1
+
+  if [[ "$has_value" == true ]]; then
+    # Set mode: validate and write
+    _config_validate "$key" "$value" || exit 1
+    eval "$var_name=\"$value\""
+    _write_config
+    echo -e "${GREEN}Set $key = $value${NC}"
+  else
+    # Get mode: print current value
+    local current
+    eval "current=\"\${$var_name:-}\""
+    if [[ -n "$current" ]]; then
+      echo "$current"
+    else
+      echo -e "${DIM}(not set)${NC}"
+    fi
+  fi
+}
+
+_config_key_to_var() {
+  local key="$1"
+  case "$key" in
+    artifacts.auto-push) echo "ARTIFACTS_AUTO_PUSH" ;;
+    artifacts.remote)    echo "ARTIFACTS_REMOTE" ;;
+    artifacts.dir)       echo "ARTIFACTS_DIR" ;;
+    skills.remote)       echo "SKILLS_REMOTE" ;;
+    features)            echo "FEATURES" ;;
+    *)
+      echo -e "${RED}Unknown config key: $key${NC}" >&2
+      echo -e "${DIM}Available keys: artifacts.auto-push, artifacts.remote, artifacts.dir, skills.remote, features${NC}" >&2
+      return 1
+      ;;
+  esac
+}
+
+_config_validate() {
+  local key="$1" value="$2"
+  case "$key" in
+    artifacts.auto-push)
+      if [[ "$value" != "true" && "$value" != "false" ]]; then
+        echo -e "${RED}Invalid value for $key: $value (must be true or false)${NC}" >&2
+        return 1
+      fi
+      ;;
+    features)
+      # Validate each feature name
+      local IFS=','
+      for f in $value; do
+        case "$f" in
+          skills|artifacts|instructions) ;;
+          *)
+            echo -e "${RED}Invalid feature: $f (must be skills, artifacts, or instructions)${NC}" >&2
+            return 1
+            ;;
+        esac
+      done
+      unset IFS
+      ;;
+    # Other keys: no validation (free-form strings/paths)
+  esac
+}
+
+_config_print_all() {
+  local config_file="${XDG_CONFIG_HOME:-$HOME/.config}/akm/config"
+  if [[ ! -f "$config_file" ]]; then
+    echo -e "${DIM}No config file found. Run 'akm setup' to create one.${NC}"
+    return 0
+  fi
+
+  echo -e "${BOLD}AKM Config${NC} ${DIM}($config_file)${NC}"
+  echo ""
+  echo -e "  features            = ${FEATURES:-${DIM}(not set)${NC}}"
+  echo -e "  skills.remote       = ${SKILLS_REMOTE:-${DIM}(not set)${NC}}"
+  echo -e "  artifacts.remote    = ${ARTIFACTS_REMOTE:-${DIM}(not set)${NC}}"
+  echo -e "  artifacts.dir       = ${ARTIFACTS_DIR:-${DIM}(not set)${NC}}"
+  echo -e "  artifacts.auto-push = ${ARTIFACTS_AUTO_PUSH:-${DIM}(not set)${NC}}"
+}
+
+cmd_sync_all() {
+  _load_config
+
+  local features="${FEATURES:-}"
+  if [[ -z "$features" ]]; then
+    echo -e "${YELLOW}No features configured. Run 'akm setup' first.${NC}" >&2
+    exit 1
+  fi
+
+  if _feature_enabled "skills"; then
+    echo -e "${BOLD}==> Skills${NC}"
+    cmd_skills_sync "$@"
+    echo ""
+  fi
+
+  if _feature_enabled "artifacts"; then
+    echo -e "${BOLD}==> Artifacts${NC}"
+    cmd_artifacts_sync "$@"
+    echo ""
+  fi
+
+  if _feature_enabled "instructions"; then
+    echo -e "${BOLD}==> Instructions${NC}"
+    cmd_instructions_sync "$@"
+    echo ""
+  fi
+}
+
+cmd_skills_status() {
   _check_deps
   _check_library
 
@@ -501,7 +1040,7 @@ cmd_status() {
       for line in "${local_lines[@]}"; do
         echo -e "$line"
       done
-      echo -e "  ${DIM}Run 'akm clean --project --migrate' to convert to manifest-based loading${NC}"
+      echo -e "  ${DIM}Run 'akm skills clean --project --migrate' to convert to manifest-based loading${NC}"
       echo ""
     fi
   fi
@@ -527,7 +1066,7 @@ cmd_status() {
   done < <(_get_all_ids)
 }
 
-cmd_list() {
+cmd_skills_list() {
   _check_deps
   _check_library
 
@@ -562,13 +1101,13 @@ cmd_list() {
     done
 }
 
-cmd_search() {
+cmd_skills_search() {
   _check_deps
   _check_library
 
   local query="${1:-}"
   if [[ -z "$query" ]]; then
-    echo -e "${RED}Usage: akm search <query>${NC}" >&2
+    echo -e "${RED}Usage: akm skills search <query>${NC}" >&2
     exit 1
   fi
 
@@ -591,7 +1130,7 @@ cmd_search() {
     done
 }
 
-cmd_add() {
+cmd_skills_add() {
   _check_deps
   _check_library
 
@@ -601,7 +1140,7 @@ cmd_add() {
   done
 
   if [[ ${#ids[@]} -eq 0 ]]; then
-    echo -e "${RED}Usage: akm add <spec-id> [spec-id...]${NC}" >&2
+    echo -e "${RED}Usage: akm skills add <spec-id> [spec-id...]${NC}" >&2
     exit 1
   fi
 
@@ -643,7 +1182,7 @@ cmd_add() {
   done
 }
 
-cmd_remove() {
+cmd_skills_remove() {
   _check_deps
   _check_library
 
@@ -653,7 +1192,7 @@ cmd_remove() {
   done
 
   if [[ ${#ids[@]} -eq 0 ]]; then
-    echo -e "${RED}Usage: akm remove <spec-id> [spec-id...]${NC}" >&2
+    echo -e "${RED}Usage: akm skills remove <spec-id> [spec-id...]${NC}" >&2
     exit 1
   fi
 
@@ -722,8 +1261,88 @@ cmd_remove() {
   done
 }
 
-cmd_sync() {
+# Run library.json generation for a specific directory.
+# Used by cmd_skills_sync to regenerate after copying from cache.
+_skills_libgen_for_dir() {
+  local target_dir="$1"
+  local quiet="${2:-false}"
+
+  local library_file="$target_dir/library.json"
+
+  # Load existing library.json — preserve ALL metadata for known specs
+  local -A existing_specs
+  if [[ -f "$library_file" ]]; then
+    while IFS= read -r spec_json; do
+      local eid
+      eid="$(echo "$spec_json" | jq -r '.id')"
+      existing_specs["$eid"]="$spec_json"
+    done < <(jq -c '.specs[]' "$library_file")
+  fi
+
+  local specs_json="[]"
+  local -A new_ids
+  local count=0
+
+  # Scan skills
+  if [[ -d "$target_dir/skills" ]]; then
+    for skill_dir in "$target_dir/skills"/*/; do
+      [[ -d "$skill_dir" ]] || continue
+      local id
+      id="$(basename "$skill_dir")"
+      local md_file="$skill_dir/SKILL.md"
+      [[ -f "$md_file" ]] || continue
+
+      new_ids["$id"]=1
+      ((count++)) || true
+
+      if [[ -n "${existing_specs[$id]+x}" ]]; then
+        specs_json=$(echo "$specs_json" | jq --argjson spec "${existing_specs[$id]}" '. + [$spec]')
+      else
+        local name desc
+        name="$(_extract_fm_field "$md_file" "name")"
+        desc="$(_extract_fm_field "$md_file" "description")"
+        [[ -z "$name" ]] && name="$id"
+        [[ -z "$desc" ]] && desc=""
+        specs_json=$(echo "$specs_json" | jq \
+          --arg id "$id" --arg type "skill" --arg name "$name" --arg desc "$desc" \
+          '. + [{"id":$id,"type":$type,"name":$name,"description":$desc,"core":false,"tags":[],"triggers":{}}]')
+      fi
+    done
+  fi
+
+  # Scan agents
+  if [[ -d "$target_dir/agents" ]]; then
+    for md_file in "$target_dir/agents"/*.md; do
+      [[ -f "$md_file" ]] || continue
+      local id
+      id="$(basename "$md_file" .md)"
+      new_ids["$id"]=1
+      ((count++)) || true
+
+      if [[ -n "${existing_specs[$id]+x}" ]]; then
+        specs_json=$(echo "$specs_json" | jq --argjson spec "${existing_specs[$id]}" '. + [$spec]')
+      else
+        local name desc
+        name="$(_extract_fm_field "$md_file" "name")"
+        desc="$(_extract_fm_field "$md_file" "description")"
+        [[ -z "$name" ]] && name="$id"
+        [[ -z "$desc" ]] && desc=""
+        specs_json=$(echo "$specs_json" | jq \
+          --arg id "$id" --arg type "agent" --arg name "$name" --arg desc "$desc" \
+          '. + [{"id":$id,"type":$type,"name":$name,"description":$desc,"core":false,"tags":[],"triggers":{}}]')
+      fi
+    done
+  fi
+
+  # Write library.json
+  echo "$specs_json" | jq '{version: 1, specs: .}' > "$library_file"
+
+  [[ "$quiet" == false ]] && echo -e "${GREEN}Library regenerated ($count specs)${NC}"
+}
+
+cmd_skills_sync() {
   _check_deps
+  _load_config
 
   local quiet=false
   while [[ $# -gt 0 ]]; do
@@ -733,30 +1352,79 @@ cmd_sync() {
     esac
   done
 
-  # --- Step 1: Update cold library from source repo ---
-  local source_repo
-  if source_repo="$(_resolve_source_repo 2>/dev/null)"; then
-    mkdir -p "$LIBRARY_DIR"
-    rm -rf "$LIBRARY_DIR/skills" "$LIBRARY_DIR/agents"
-    cp -r "$source_repo/skills" "$LIBRARY_DIR/"
-    cp -r "$source_repo/agents" "$LIBRARY_DIR/"
-    cp "$source_repo/library.json" "$LIBRARY_DIR/"
-    if [[ "$quiet" == false ]]; then
-      echo -e "${GREEN}✓ Cold library updated from $source_repo${NC}"
+  local remote="${SKILLS_REMOTE:-}"
+  local cache_dir="$HOME/.cache/akm/skills-remote"
+
+  # --- Step 1: Sync remote to cache ---
+  if [[ -n "$remote" ]]; then
+    if [[ -d "$cache_dir/.git" ]]; then
+      # Pull latest
+      local pull_output
+      if ! pull_output="$(git -C "$cache_dir" pull --rebase --autostash --quiet 2>&1)"; then
+        echo -e "${YELLOW}Warning: Failed to pull skills remote: $remote. Check your connection or SSH keys.${NC}" >&2
+        [[ -n "$pull_output" ]] && echo -e "${DIM}$pull_output${NC}" >&2
+        echo -e "${DIM}Continuing with cached copy.${NC}" >&2
+      else
+        [[ "$quiet" == false ]] && echo -e "${GREEN}Skills remote updated${NC}"
+      fi
+    else
+      # First-time clone
+      mkdir -p "$(dirname "$cache_dir")"
+      local clone_output
+      if ! clone_output="$(git clone --quiet "$remote" "$cache_dir" 2>&1)"; then
+        echo -e "${YELLOW}Warning: Failed to clone skills remote: $remote. Check the URL and your SSH keys.${NC}" >&2
+        [[ -n "$clone_output" ]] && echo -e "${DIM}$clone_output${NC}" >&2
+        if [[ ! -f "$LIBRARY_JSON" ]]; then
+          echo -e "${RED}Error: No cached skills and no existing cold library. Cannot proceed.${NC}" >&2
+          return 1
+        fi
+        echo -e "${DIM}Continuing with existing cold library.${NC}" >&2
+      else
+        [[ "$quiet" == false ]] && echo -e "${GREEN}Skills remote cloned${NC}"
+      fi
     fi
   else
-    # No source repo found — fall back to existing cold library if present
-    if [[ ! -f "$LIBRARY_JSON" ]]; then
-      echo -e "${RED}Error: No source repo and no existing cold library.${NC}" >&2
-      echo -e "${DIM}Run sync.sh first to bootstrap, or set AKM_REPO.${NC}" >&2
-      exit 1
-    fi
     if [[ "$quiet" == false ]]; then
-      echo -e "${YELLOW}Warning: Source repo not found. Rebuilding symlinks from existing cold library.${NC}" >&2
+      if [[ -f "$LIBRARY_JSON" ]]; then
+        echo -e "${DIM}No skills remote configured. Working with existing cold library.${NC}"
+      else
+        echo -e "${DIM}No skills remote configured and no existing cold library. Skipping skills sync.${NC}"
+        return 0
+      fi
     fi
   fi
 
-  # --- Step 2: Rebuild global symlinks from cold library ---
+  # --- Step 2: Copy from cache to cold library ---
+  if [[ -d "$cache_dir" ]]; then
+    mkdir -p "$LIBRARY_DIR"
+
+    if [[ -d "$cache_dir/skills" ]]; then
+      rm -rf "$LIBRARY_DIR/skills"
+      cp -r "$cache_dir/skills" "$LIBRARY_DIR/"
+    fi
+
+    if [[ -d "$cache_dir/agents" ]]; then
+      rm -rf "$LIBRARY_DIR/agents"
+      cp -r "$cache_dir/agents" "$LIBRARY_DIR/"
+    fi
+
+    if [[ -f "$cache_dir/library.json" ]]; then
+      cp "$cache_dir/library.json" "$LIBRARY_DIR/"
+    fi
+
+    [[ "$quiet" == false ]] && echo -e "${GREEN}Cold library updated from cache${NC}"
+  fi
+
+  # --- Step 3: Run libgen to ensure library.json is current ---
+  if [[ -d "$LIBRARY_DIR/skills" ]] || [[ -d "$LIBRARY_DIR/agents" ]]; then
+    _skills_libgen_for_dir "$LIBRARY_DIR" "$quiet"
+  fi
+
+  # --- Step 4: Rebuild global symlinks from cold library ---
+  if [[ ! -f "$LIBRARY_JSON" ]]; then
+    [[ "$quiet" == false ]] && echo -e "${DIM}No library.json found. Skipping symlink rebuild.${NC}"
+    return 0
+  fi
 
   # Clear existing symlinks in global tool dirs (only symlinks, not real files/dirs)
   for tool_dir in "${GLOBAL_TOOL_DIRS[@]}"; do
@@ -777,79 +1445,15 @@ cmd_sync() {
   done
 
   local count=0
-
-  # Symlink core specs into all global dirs
   while IFS= read -r id; do
     _create_symlink "$id" && ((count++)) || true
   done < <(_get_core_ids)
 
-  if [[ "$quiet" == false ]]; then
-    echo -e "${GREEN}✓ $count core symlinks created across ${#GLOBAL_TOOL_DIRS[@]} global tool directories${NC}"
-  fi
+  [[ "$quiet" == false ]] && echo -e "${GREEN}$count core symlinks created across ${#GLOBAL_TOOL_DIRS[@]} global tool directories${NC}"
 }
 
-cmd_init() {
-  _check_deps
-  _check_library
 
-  local dry_run=false
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --dry-run) dry_run=true; shift ;;
-      *)         shift ;;
-    esac
-  done
-
-  local project_root
-  project_root="$(_project_root)"
-  if [[ -z "$project_root" ]]; then
-    echo -e "${RED}Error: Not in a git repository.${NC}" >&2
-    exit 1
-  fi
-
-  echo -e "${BOLD}Initializing project:${NC} $project_root"
-
-  if [[ "$dry_run" == true ]]; then
-    echo -e "${DIM}Would create .claude/, .github/, and .agents/ directories${NC}"
-    echo -e "${DIM}Would create AGENTS.md, CLAUDE.md, and .agents/akm.json if missing${NC}"
-    return 0
-  fi
-
-  # Create project-local directories
-  for pdir in "$project_root/.claude" "$project_root/.github"; do
-    mkdir -p "$pdir"/{skills,agents}
-  done
-  echo -e "${GREEN}✓ Created .claude/ and .github/ directories${NC}"
-
-  # Create .agents/ directory and manifest stub
-  mkdir -p "$project_root/.agents"
-  if [[ ! -f "$project_root/.agents/akm.json" ]]; then
-    echo '{"skills":[],"agents":[]}' > "$project_root/.agents/akm.json"
-    echo -e "${GREEN}✓ Created .agents/akm.json manifest${NC}"
-  else
-    echo -e "${DIM}  .agents/akm.json already exists${NC}"
-  fi
-
-  # Create AGENTS.md if missing
-  if [[ ! -f "$project_root/AGENTS.md" ]]; then
-    echo "# Project LLM Instructions" > "$project_root/AGENTS.md"
-    echo -e "${GREEN}✓ Created AGENTS.md${NC}"
-  else
-    echo -e "${DIM}  AGENTS.md already exists${NC}"
-  fi
-
-  # Create CLAUDE.md if missing
-  if [[ ! -f "$project_root/CLAUDE.md" ]]; then
-    echo "Local instructions are in @AGENTS.md" > "$project_root/CLAUDE.md"
-    echo -e "${GREEN}✓ Created CLAUDE.md${NC}"
-  else
-    echo -e "${DIM}  CLAUDE.md already exists${NC}"
-  fi
-
-  echo -e "\n${DIM}Use 'akm add <id>' to add specs to this project manifest.${NC}"
-}
-
-cmd_clean() {
+cmd_skills_clean() {
   _check_deps
 
   local dry_run=false project=false migrate=false
@@ -864,7 +1468,7 @@ cmd_clean() {
 
   if [[ "$project" == true ]]; then
     if [[ "$migrate" == true ]]; then
-      cmd_migrate
+      cmd_skills_migrate
     fi
     _clean_project "$dry_run"
   else
@@ -971,7 +1575,7 @@ _clean_project() {
   fi
 }
 
-cmd_load() {
+cmd_skills_load() {
   _check_deps
   _check_library
   _check_session
@@ -982,7 +1586,7 @@ cmd_load() {
   done
 
   if [[ ${#ids[@]} -eq 0 ]]; then
-    echo -e "${RED}Usage: akm load <spec-id> [spec-id...]${NC}" >&2
+    echo -e "${RED}Usage: akm skills load <spec-id> [spec-id...]${NC}" >&2
     exit 1
   fi
 
@@ -1011,7 +1615,7 @@ cmd_load() {
   fi
 }
 
-cmd_unload() {
+cmd_skills_unload() {
   _check_session
 
   local ids=()
@@ -1020,7 +1624,7 @@ cmd_unload() {
   done
 
   if [[ ${#ids[@]} -eq 0 ]]; then
-    echo -e "${RED}Usage: akm unload <spec-id> [spec-id...]${NC}" >&2
+    echo -e "${RED}Usage: akm skills unload <spec-id> [spec-id...]${NC}" >&2
     exit 1
   fi
 
@@ -1034,7 +1638,7 @@ cmd_unload() {
   done
 }
 
-cmd_loaded() {
+cmd_skills_loaded() {
   _check_deps
   _check_library
   _check_session
@@ -1113,7 +1717,7 @@ cmd_loaded() {
   done < <(_get_core_ids)
 }
 
-cmd_migrate() {
+cmd_skills_migrate() {
   _check_deps
   _check_library
 
@@ -1288,7 +1892,7 @@ cmd_migrate() {
   echo -e "  3. Commit the manifest: ${DIM}git add .agents/akm.json && git commit -m 'chore: migrate to manifest-based spec loading'${NC}"
 }
 
-cmd_publish() {
+cmd_skills_publish() {
   _check_deps
 
   # --- Parse arguments ---
@@ -1309,13 +1913,17 @@ cmd_publish() {
   done
 
   if [[ -z "$id" ]]; then
-    echo -e "${RED}Usage: akm publish <id> [--dry-run] [--force]${NC}" >&2
+    echo -e "${RED}Usage: akm skills publish <id> [--dry-run] [--force]${NC}" >&2
     exit 1
   fi
 
-  # --- Resolve source repo ---
-  local source_repo
-  source_repo="$(_resolve_source_repo)"
+  # --- Resolve source repo (cached clone) ---
+  local cache_dir="$HOME/.cache/akm/skills-remote"
+  if [[ ! -d "$cache_dir/.git" ]]; then
+    echo -e "${RED}Error: No skills remote cache found. Run 'akm skills sync' first.${NC}" >&2
+    exit 1
+  fi
+  local source_repo="$cache_dir"
 
   local library_file="$source_repo/library.json"
 
@@ -1550,143 +2158,48 @@ EOF
   echo -e "${GREEN}✓ Publish complete for $spec_type '$id'${NC}"
 }
 
-cmd_libgen() {
+cmd_skills_libgen() {
   _check_deps
 
-  # Locate repo root (from script location or git)
-  local repo_dir
-  repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-  if [[ ! -d "$repo_dir/skills" ]]; then
-    repo_dir="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  # Locate target dir: repo root if in a repo with skills/, otherwise cold library
+  local target_dir
+  target_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  if [[ ! -d "$target_dir/skills" ]]; then
+    target_dir="$(git rev-parse --show-toplevel 2>/dev/null || true)"
   fi
-  if [[ -z "$repo_dir" || ! -d "$repo_dir/skills" ]]; then
-    echo -e "${RED}Error: Cannot locate repo root with skills/ directory.${NC}" >&2
+  if [[ -z "$target_dir" || ! -d "$target_dir/skills" ]]; then
+    # Fall back to cold library
+    target_dir="$LIBRARY_DIR"
+  fi
+  if [[ ! -d "$target_dir/skills" && ! -d "$target_dir/agents" ]]; then
+    echo -e "${RED}Error: Cannot locate a directory with skills/ or agents/.${NC}" >&2
     exit 1
   fi
 
-  local library_file="$repo_dir/library.json"
+  _skills_libgen_for_dir "$target_dir" false
 
-  # Load existing library.json — preserve ALL metadata for known specs
-  local -A existing_specs
-  if [[ -f "$library_file" ]]; then
-    while IFS= read -r spec_json; do
-      local eid
-      eid="$(echo "$spec_json" | jq -r '.id')"
-      existing_specs["$eid"]="$spec_json"
-    done < <(jq -c '.specs[]' "$library_file")
-  fi
-
-  # Collect existing IDs for add/remove tracking
-  local -A old_ids
-  for oid in "${!existing_specs[@]}"; do
-    old_ids["$oid"]=1
-  done
-
-  local specs_json="[]"
-  local -A new_ids
-  local added=() removed=() preserved=()
-
-  # Scan skills (each is a directory with SKILL.md)
-  if [[ -d "$repo_dir/skills" ]]; then
-    for skill_dir in "$repo_dir/skills"/*/; do
-      [[ -d "$skill_dir" ]] || continue
-      local id
-      id="$(basename "$skill_dir")"
-      local md_file="$skill_dir/SKILL.md"
-      [[ -f "$md_file" ]] || continue
-
-      new_ids["$id"]=1
-
-      if [[ -n "${existing_specs[$id]+x}" ]]; then
-        specs_json=$(echo "$specs_json" | jq --argjson spec "${existing_specs[$id]}" '. + [$spec]')
-        preserved+=("$id")
-      else
-        local name desc
-        name="$(_extract_fm_field "$md_file" "name")"
-        desc="$(_extract_fm_field "$md_file" "description")"
-        [[ -z "$name" ]] && name="$id"
-        [[ -z "$desc" ]] && desc=""
-
-        specs_json=$(echo "$specs_json" | jq \
-          --arg id "$id" --arg type "skill" --arg name "$name" --arg desc "$desc" \
-          '. + [{"id":$id,"type":$type,"name":$name,"description":$desc,"core":false,"tags":[],"triggers":{}}]')
-        added+=("$id")
-      fi
-    done
-  fi
-
-  # Scan agents (each is a .md file)
-  if [[ -d "$repo_dir/agents" ]]; then
-    for md_file in "$repo_dir/agents"/*.md; do
-      [[ -f "$md_file" ]] || continue
-      local id
-      id="$(basename "$md_file" .md)"
-      new_ids["$id"]=1
-
-      if [[ -n "${existing_specs[$id]+x}" ]]; then
-        specs_json=$(echo "$specs_json" | jq --argjson spec "${existing_specs[$id]}" '. + [$spec]')
-        preserved+=("$id")
-      else
-        local name desc
-        name="$(_extract_fm_field "$md_file" "name")"
-        desc="$(_extract_fm_field "$md_file" "description")"
-        [[ -z "$name" ]] && name="$id"
-        [[ -z "$desc" ]] && desc=""
-
-        specs_json=$(echo "$specs_json" | jq \
-          --arg id "$id" --arg type "agent" --arg name "$name" --arg desc "$desc" \
-          '. + [{"id":$id,"type":$type,"name":$name,"description":$desc,"core":false,"tags":[],"triggers":{}}]')
-        added+=("$id")
-      fi
-    done
-  fi
-
-  # Detect removed specs
-  for oid in "${!old_ids[@]}"; do
-    if [[ -z "${new_ids[$oid]+x}" ]]; then
-      removed+=("$oid")
-    fi
-  done
-
-  # Write library.json
-  echo "$specs_json" | jq '{version: 1, specs: .}' > "$library_file"
-
-  # Report
-  echo -e "${GREEN}✓ Generated $library_file${NC}"
-  echo -e "  Specs on disk: ${#new_ids[@]}"
-  if [[ ${#added[@]} -gt 0 ]]; then
-    echo -e "  ${GREEN}Added (${#added[@]}):${NC} ${added[*]}"
-  fi
-  if [[ ${#removed[@]} -gt 0 ]]; then
-    echo -e "  ${YELLOW}Removed (${#removed[@]}):${NC} ${removed[*]}"
-  fi
-  if [[ ${#preserved[@]} -gt 0 ]]; then
-    echo -e "  ${DIM}Preserved metadata (${#preserved[@]}):${NC} ${preserved[*]}"
-  fi
+  # Detailed report
+  local library_file="$target_dir/library.json"
+  local count
+  count="$(jq '.specs | length' "$library_file")"
+  echo -e "  Specs on disk: $count"
 }
 
 # --- Main ---
 
 main() {
-  local subcommand="${1:-status}"
+  local command="${1:-help}"
 
-  case "$subcommand" in
-    status)     shift 2>/dev/null || true; cmd_status "$@" ;;
-    list)       shift; cmd_list "$@" ;;
-    search)     shift; cmd_search "$@" ;;
-    add)        shift; cmd_add "$@" ;;
-    remove)     shift; cmd_remove "$@" ;;
-    sync)       shift; cmd_sync "$@" ;;
-    init)       shift; cmd_init "$@" ;;
-    clean)      shift; cmd_clean "$@" ;;
-    publish)    shift; cmd_publish "$@" ;;
-    libgen)     shift; cmd_libgen "$@" ;;
-    load)       shift; cmd_load "$@" ;;
-    unload)     shift; cmd_unload "$@" ;;
-    loaded)     shift; cmd_loaded "$@" ;;
+  case "$command" in
+    skills)       shift; cmd_skills "$@" ;;
+    artifacts)    shift; cmd_artifacts "$@" ;;
+    instructions) shift; cmd_instructions "$@" ;;
+    setup)        shift; cmd_setup "$@" ;;
+    config)       shift; cmd_config "$@" ;;
+    sync)         shift; cmd_sync_all "$@" ;;
     help|--help|-h) cmd_help ;;
     *)
-      echo -e "${RED}Unknown subcommand: $subcommand${NC}" >&2
+      echo -e "${RED}Unknown command: $command${NC}" >&2
       echo "Run 'akm help' for usage." >&2
       exit 1
       ;;

@@ -1,109 +1,120 @@
 # AKM — Agent Kit Manager
 
-A CLI tool and library for managing reusable [Agent Skills](https://agentskills.io/) across LLM-powered coding assistants (Claude Code, GitHub Copilot CLI, OpenCode, and more).
-
-AKM provides **cold storage**, **three-layer activation**, and **session isolation** for skills and agents — so your LLM tools load exactly the right context for each project and session.
+A CLI tool for managing reusable [Agent Skills](https://agentskills.io/), LLM session artifacts, and global instructions across LLM-powered coding assistants (Claude Code, GitHub Copilot CLI, OpenCode, and more).
 
 ## Features
 
-- **Cold library** — A single source of truth at `~/.local/share/akm/`, decoupled from any project
-- **Three-layer activation** — Core (global), project (manifest), and session (JIT) loading
-- **Session isolation** — Per-session staging dirs prevent collisions between parallel sessions
-- **Code/skills separation** — Project manifests declare skill IDs only; no spec content committed to project repos
+- **Skills management** — Cold library, three-layer activation (core/project/session), per-session isolation
+- **Artifact sync** — Auto-sync LLM session outputs (plans, research, notes) to a git repo
+- **Global instructions** — Distribute shared LLM instructions to all tool directories
 - **Multi-tool support** — Works with Claude Code, GitHub Copilot CLI, OpenCode, and more
 - **60+ skills included** — Development workflows, code review, TDD, planning, debugging, and more
 
 ## Prerequisites
 
 - **jq** — Install with your package manager (e.g., `sudo apt-get install jq`, `brew install jq`)
-- **git** — For cloning and repo detection
+- **git** — For cloning, repo detection, and artifact sync
 
 ## Quick Start
 
 ```bash
 # Clone and install
 git clone https://github.com/<org>/akm ~/akm
-bash ~/akm/install.sh    # installs CLI, syncs library, wires ~/.bashrc
+bash ~/akm/install.sh
+
+# Configure (interactive)
+akm setup
 
 # Open a new terminal (or source ~/.bashrc), then:
-akm status
+akm skills status
 ```
 
 ## How It Works
 
-### Three-Layer Activation
+### Three Domains
+
+AKM manages three independent subsystems, each enableable via `akm setup`:
+
+| Domain | Purpose | Key command |
+|--------|---------|-------------|
+| **Skills** | Manage and load LLM skills/agents | `akm skills sync` |
+| **Artifacts** | Sync session outputs to a git repo | `akm artifacts sync` |
+| **Instructions** | Distribute global LLM instructions | `akm instructions sync` |
+
+### Skills: Three-Layer Activation
 
 ```
 Layer 1 — Core (global, always available)
-  akm sync → cold library (~/.local/share/akm/)
-           → symlinks into ~/.claude/, ~/.copilot/, ~/.agents/
+  akm skills sync → cold library (~/.local/share/akm/)
+                   → symlinks into ~/.claude/, ~/.copilot/, ~/.agents/
 
 Layer 2 — Project (declared in manifest, loaded at session start)
   .agents/akm.json lists skill/agent IDs
   → shell wrapper reads manifest → symlinks into staging dir
 
 Layer 3 — Session (JIT, mid-session)
-  akm load <id>   → adds to active staging dir
-  akm unload <id> → removes from staging dir
+  akm skills load <id>   → adds to active staging dir
+  akm skills unload <id> → removes from staging dir
 ```
 
 ### Shell Wrappers
 
-When you source `akm-init.sh` (done automatically by `install.sh`), it provides wrapper functions for `claude`, `copilot`, and `opencode` that automatically:
-1. Create a per-session staging directory
-2. Populate it from the project manifest (`.agents/akm.json`)
-3. Pass the staging dir to the tool via `--add-dir`
-4. Clean up on exit
+When you source `akm-init.sh` (wired by `akm setup`), wrapper functions for `claude`, `copilot`, and `opencode` automatically:
+1. Pull latest artifacts (if enabled)
+2. Create a per-session skills staging directory (if enabled)
+3. Pass relevant dirs to the tool via `--add-dir`
+4. Commit and push artifacts on exit (if auto-push enabled)
+5. Clean up staging directory on exit
 
 ## CLI Reference
 
 ```
-akm <subcommand> [options] [arguments]
+akm <command> [subcommand] [options]
 
-Global:
-  sync            Rebuild core spec symlinks in global dirs
-  clean           Remove stale specs from global or project dirs
-    --project       Clean project dirs instead of global
-    --migrate       (with --project) Migrate legacy copies to manifest first
-    --dry-run       Show what would happen without making changes
-  status          Show core, session, manifest, and available specs (default)
+Setup & Config:
+  setup                          Interactive feature configuration
+    --skills                     Configure skills only
+    --artifacts                  Configure artifacts only
+    --instructions               Configure instructions only
+  config <key> [value]           Get or set a config value
+  sync                           Sync all enabled subsystems
+  help                           Show help
 
-Project:
-  init            Initialize project dirs and manifest stub
-  add <id>        Add spec ID(s) to project manifest (.agents/akm.json)
-  remove <id>     Remove spec ID(s) from project manifest
+Skills:
+  skills sync                    Pull remote → cold library → rebuild symlinks
+  skills add <id> [id...]        Add spec ID(s) to project manifest
+  skills remove <id> [id...]     Remove spec ID(s) from project manifest
+  skills load <id> [id...]       Load spec into active session (JIT)
+  skills unload <id> [id...]     Remove spec from active session
+  skills loaded                  Show specs in active session
+  skills list [--tag TAG] [--type TYPE]  List library
+  skills search <query>          Search library by keyword
+  skills status                  Show core, session, manifest, and cold specs
+  skills clean [--project]       Remove stale specs
+  skills publish <id>            Publish local spec to source repo as PR
+  skills libgen                  Regenerate library.json from disk
 
-Session:
-  load <id>       Symlink spec into active staging dir (JIT loading)
-  unload <id>     Remove spec from active staging dir
-  loaded          Show specs loaded in active session
+Artifacts:
+  artifacts sync                 Bidirectional sync with artifacts remote
 
-Publishing:
-  publish <id>    Publish a local spec to the source repo as a PR
-    --dry-run       Show what would happen without making changes
-    --force         Overwrite if spec already exists in source repo
-
-Discovery:
-  list            List all specs in the library (--tag TAG, --type skill|agent)
-  search <query>  Search specs by keyword
-  libgen          Auto-generate library.json from disk contents
-  help            Show help
+Instructions:
+  instructions sync              Distribute global instructions to tool dirs
+  instructions scaffold-project  Create AGENTS.md + CLAUDE.md in project root
 ```
 
-## Included Skills
+## Configuration
 
-AKM ships with 63 skills covering:
+All config lives in `~/.config/akm/config` (flat key=value, sourceable by bash):
 
-| Category | Skills |
-|----------|--------|
-| **Development workflow** | brainstorming, writing-plans, executing-plans, test-driven-development, verification-before-completion |
-| **Code quality** | critical-code-reviewer, requesting-code-review, receiving-code-review, systematic-debugging |
-| **Git & collaboration** | git-commit, finishing-a-development-branch, using-git-worktrees, pr-create, solve-issue, triage-issues |
-| **Multi-agent** | planning-team, implementing-team, dispatching-parallel-agents, subagent-driven-development, solve-batch |
-| **Writing & docs** | technical-writer, editor, content-creator, adr-writing |
-| **Domain-specific** | R packages, Shiny, Quarto, Rust, Vitest, Supabase, and more |
+```bash
+FEATURES="skills,artifacts,instructions"
+SKILLS_REMOTE="git@github.com:user/skills-library.git"
+ARTIFACTS_REMOTE="git@github.com:user/llm-artifacts.git"
+ARTIFACTS_DIR="$HOME/.akm/artifacts"
+ARTIFACTS_AUTO_PUSH="true"
+```
 
-See `akm list` for the full inventory with descriptions.
+Use `akm config` to view/edit, or `akm setup` for interactive configuration.
 
 ## Skill Format
 
@@ -133,24 +144,43 @@ These are loaded automatically when you start a session via the shell wrappers.
 ## Machine Layout
 
 ```
-~/.local/bin/akm                    # CLI tool
-~/.local/share/akm/                 # Cold library (source of truth)
-  ├── skills/                       # All skills
-  ├── agents/                       # All agents
-  ├── library.json                  # Registry
-  └── shell/akm-init.sh            # Shell init script
-~/.config/akm/config                # REPO= path to source repo
-~/.cache/akm/                       # Ephemeral session staging dirs
+~/.local/bin/akm                    # CLI binary
+~/.local/share/akm/                 # System data (XDG-compliant)
+  ├── skills/                       # Cold library — local package store
+  ├── agents/                       # Cold library
+  ├── library.json                  # Spec registry
+  ├── shell/akm-init.sh            # Shell integration script
+  └── global-instructions.md       # User's global instructions
+~/.config/akm/config                # All config (flat key=value)
+~/.cache/akm/                       # Ephemeral data
+  ├── skills-remote/               # Cached clone of SKILLS_REMOTE
+  └── <project>-<ts>-<pid>/        # Session staging dirs
+~/.akm/artifacts/<repo>/            # Artifact dirs per project
 ```
+
+## Included Skills
+
+AKM ships with 63+ skills covering:
+
+| Category | Skills |
+|----------|--------|
+| **Development workflow** | brainstorming, writing-plans, executing-plans, test-driven-development, verification-before-completion |
+| **Code quality** | critical-code-reviewer, requesting-code-review, receiving-code-review, systematic-debugging |
+| **Git & collaboration** | git-commit, finishing-a-development-branch, using-git-worktrees, pr-create, solve-issue, triage-issues |
+| **Multi-agent** | planning-team, implementing-team, dispatching-parallel-agents, subagent-driven-development, solve-batch |
+| **Writing & docs** | technical-writer, editor, content-creator, adr-writing |
+| **Domain-specific** | R packages, Shiny, Quarto, Rust, Vitest, Supabase, and more |
+
+See `akm skills list` for the full inventory with descriptions.
 
 ## Third-Party Attributions
 
 Some included skills were created by or derived from third-party authors:
 
 - Skills by **Garrick Aden-Buie** (@gadenbuie): `cran-extrachecks`, `testing-r-packages`, `lifecycle`, `cli` — MIT License
-- **Mickaël Canouil** (@mcanouil): `quarto-authoring` — MIT License
+- **Mickael Canouil** (@mcanouil): `quarto-authoring` — MIT License
 - **Anthony Fu** (@antfu): `vitest` — generated from [vitest-dev/vitest](https://github.com/vitest-dev/vitest)
-- R language skills derived from **Sarah Johnson** (@sj-io): `metaprogramming-rlang`, `developing-packages-r`, `writing-tidyverse-r`, `customizing-vectors-r`, `designing-oop-r`, `optimizing-r`
+- R language skills derived from **Sarah Johnson** (@sj-io)
 - Skills with Apache 2.0 license: `webapp-testing`, `frontend-design`, `skill-creator`, `canvas-design`, `algorithmic-art`, `internal-comms`
 
 See individual skill directories for full license terms.
