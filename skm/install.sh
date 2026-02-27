@@ -1,6 +1,8 @@
 #!/bin/bash
 # SKM (Skill Kit Manager) — One-time setup
-# Installs the skm CLI and syncs the cold library.
+# Installs the skm CLI, syncs the cold library, and wires shell integration.
+#
+# Prerequisites: jq (see README for install instructions)
 #
 # Usage:
 #   git clone https://github.com/<org>/skm ~/skm
@@ -10,11 +12,11 @@ set -e
 REPO="$(cd "$(dirname "$0")" && pwd)"
 echo "==> Installing SKM from $REPO"
 
-# --- Dependencies ---
+# --- Check dependencies ---
 if ! command -v jq &>/dev/null; then
-  echo "==> Installing jq"
-  sudo apt-get update -qq
-  sudo apt-get install -y -qq jq
+  echo "Error: jq is required but not installed." >&2
+  echo "Install it first:  sudo apt-get install jq  (or see README)" >&2
+  exit 1
 fi
 
 # --- Install CLI ---
@@ -45,17 +47,24 @@ mkdir -p "$HOME/.claude" "$HOME/.copilot" "$HOME/.agents" "$HOME/.vibe/prompts"
 echo "==> Syncing cold library"
 skm sync --quiet
 
-# --- Shell init ---
-echo "==> Installing shell init script"
+# --- Shell init (idempotent marker block in .bashrc) ---
+echo "==> Wiring shell integration"
 SHELL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/skm/shell"
 mkdir -p "$SHELL_DIR"
 cp "$REPO/shell/skm-init.sh" "$SHELL_DIR/skm-init.sh"
 
+SKM_MARKER_START="# >>> skm >>>"
+SKM_MARKER_END="# <<< skm <<<"
+SKM_INIT_PATH="\${XDG_DATA_HOME:-\$HOME/.local/share}/skm/shell/skm-init.sh"
+
+if [ -f "$HOME/.bashrc" ]; then
+  sed -i "/$SKM_MARKER_START/,/$SKM_MARKER_END/d" "$HOME/.bashrc"
+fi
+{
+  echo "$SKM_MARKER_START"
+  echo "[ -f \"$SKM_INIT_PATH\" ] && source \"$SKM_INIT_PATH\""
+  echo "$SKM_MARKER_END"
+} >> "$HOME/.bashrc"
+
 echo ""
-echo "==> SKM installed!"
-echo ""
-echo "Add this to your ~/.bashrc (after any artifact helpers, before PS1):"
-echo ""
-echo "  source \"\${XDG_DATA_HOME:-\$HOME/.local/share}/skm/shell/skm-init.sh\""
-echo ""
-echo "Then: source ~/.bashrc"
+echo "==> SKM installed! Open a new terminal or run: source ~/.bashrc"

@@ -77,10 +77,9 @@ Core specs (`"core": true`) are symlinked into global tool dirs by `skm sync`.
 | Command | Description |
 |---------|-------------|
 | `sync` | Rebuild core symlinks in global dirs |
-| `clean [--project]` | Remove stale non-symlinks |
-| `add <id>` | Add spec to project manifest |
-| `remove <id>` | Remove spec from project manifest |
-| `refresh` | Update project staging from cold library |
+| `clean` | Remove stale specs (`--project` for project, `--migrate` to migrate legacy) |
+| `add <id>` | Add spec to project manifest (auto-refreshes active session) |
+| `remove <id>` | Remove spec from project manifest (auto-refreshes active session) |
 | `load <id>` | JIT-load spec into active session |
 | `unload <id>` | Remove spec from active session |
 | `loaded` | Show active session specs |
@@ -88,9 +87,8 @@ Core specs (`"core": true`) are symlinked into global tool dirs by `skm sync`.
 | `init` | Create project directory structure |
 | `list` | List specs with filters |
 | `search <query>` | Keyword search |
-| `generate-library` | Regenerate library.json from disk |
+| `libgen` | Regenerate library.json from disk |
 | `publish <id>` | Publish project-local spec as PR |
-| `migrate` | Convert legacy setup to manifest-based |
 
 ### Shell Init (`shell/skm-init.sh`)
 
@@ -100,16 +98,13 @@ Defines `claude()`, `copilot()`, `opencode()` wrappers that:
 3. Pass `--add-dir` to the tool
 4. Clean up staging on exit
 
-Artifact integration is optional — if `_artifact_ensure_dir` / `_artifact_commit_and_push`
-are defined (e.g., by user's own bashrc), wrappers use them automatically.
-
 ## Conventions
 
 - All shell scripts use `set -e` or `set -euo pipefail`
 - `jq` is the sole runtime dependency
 - Skill frontmatter follows the [Agent Skills spec](https://agentskills.io/specification)
 - Commit style: conventional commits, WHY over WHAT
-- Adding new specs: create in `skills/` or `agents/` → run `skm generate-library`
+- Adding new specs: create in `skills/` or `agents/` → run `skm libgen`
 
 ## Roadmap
 

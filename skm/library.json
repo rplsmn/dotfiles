@@ -416,18 +416,6 @@
       "triggers": {}
     },
     {
-      "id": "nano-banana-pro",
-      "type": "skill",
-      "name": "nano-banana-pro",
-      "description": "Generate or edit images via Gemini 3 Pro Image (Nano Banana Pro).",
-      "core": false,
-      "tags": [
-        "creative",
-        "image"
-      ],
-      "triggers": {}
-    },
-    {
       "id": "optimizing-r",
       "type": "skill",
       "name": "optimizing-r",
@@ -748,21 +736,6 @@
         "package"
       ],
       "triggers": {}
-    },
-    {
-      "id": "toto",
-      "type": "skill",
-      "name": "toto",
-      "description": "Use when asked about your name",
-      "core": false,
-      "tags": [
-        "dev",
-        "temp"
-      ],
-      "triggers": {
-        "files": [],
-        "extensions": []
-      }
     },
     {
       "id": "triage-issues",

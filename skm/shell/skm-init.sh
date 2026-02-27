@@ -3,12 +3,8 @@
 # and LLM tool wrappers (claude, copilot, opencode).
 #
 # Usage:
-#   # In your .bashrc:
+#   # In your .bashrc (or sourced automatically by install.sh):
 #   source ~/.local/share/skm/shell/skm-init.sh
-#
-# If artifact helpers (_artifact_ensure_dir, _artifact_commit_and_push) are
-# defined before this file is sourced, the tool wrappers will integrate with
-# them automatically.  Otherwise they work standalone.
 
 # --- Tool helpers ---
 
@@ -102,11 +98,7 @@ _skm_session_start() {
   done
 
   # Layer 2: load specs from project manifest
-  # Try skm.json first, fall back to legacy specs-sync.json
   local manifest="$project_root/.agents/skm.json"
-  if [[ ! -f "$manifest" ]]; then
-    manifest="$project_root/.agents/specs-sync.json"
-  fi
 
   if [[ -f "$manifest" ]] && command -v jq &>/dev/null; then
     local id
@@ -139,66 +131,22 @@ _skm_session_end() {
 # --- Tool wrappers ---
 # These wrap LLM CLI tools to automatically:
 #   1. Set up a per-session skills staging directory
-#   2. Optionally attach an artifact directory (if helpers are defined)
-#   3. Clean up on exit
+#   2. Clean up on exit
 
-claude() {
+_skm_wrap_tool() {
+  local tool="$1"; shift
   local extra_args=()
   if _in_git_repo; then
-    # Artifact dir integration (if shared-safe-config or similar provides helpers)
-    if type -t _artifact_ensure_dir &>/dev/null; then
-      local artifact_dir
-      artifact_dir="$(_artifact_ensure_dir)" && extra_args+=(--add-dir "$artifact_dir")
-    fi
     _skm_session_start && extra_args+=(--add-dir "$SKM_SESSION")
   fi
 
-  command claude "${extra_args[@]}" "$@"
+  command "$tool" "${extra_args[@]}" "$@"
   local exit_code=$?
 
   _skm_session_end
-  if _in_git_repo && type -t _artifact_commit_and_push &>/dev/null; then
-    _artifact_commit_and_push
-  fi
   return $exit_code
 }
 
-copilot() {
-  local extra_args=()
-  if _in_git_repo; then
-    if type -t _artifact_ensure_dir &>/dev/null; then
-      local artifact_dir
-      artifact_dir="$(_artifact_ensure_dir)" && extra_args+=(--add-dir "$artifact_dir")
-    fi
-    _skm_session_start && extra_args+=(--add-dir "$SKM_SESSION")
-  fi
-
-  command copilot "${extra_args[@]}" "$@"
-  local exit_code=$?
-
-  _skm_session_end
-  if _in_git_repo && type -t _artifact_commit_and_push &>/dev/null; then
-    _artifact_commit_and_push
-  fi
-  return $exit_code
-}
-
-opencode() {
-  local extra_args=()
-  if _in_git_repo; then
-    if type -t _artifact_ensure_dir &>/dev/null; then
-      local artifact_dir
-      artifact_dir="$(_artifact_ensure_dir)" && extra_args+=(--add-dir "$artifact_dir")
-    fi
-    _skm_session_start && extra_args+=(--add-dir "$SKM_SESSION")
-  fi
-
-  command opencode "${extra_args[@]}" "$@"
-  local exit_code=$?
-
-  _skm_session_end
-  if _in_git_repo && type -t _artifact_commit_and_push &>/dev/null; then
-    _artifact_commit_and_push
-  fi
-  return $exit_code
-}
+claude()   { _skm_wrap_tool claude   "$@"; }
+copilot()  { _skm_wrap_tool copilot  "$@"; }
+opencode() { _skm_wrap_tool opencode "$@"; }

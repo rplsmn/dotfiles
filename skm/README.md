@@ -11,19 +11,21 @@ SKM provides **cold storage**, **three-layer activation**, and **session isolati
 - **Session isolation** — Per-session staging dirs prevent collisions between parallel sessions
 - **Code/skills separation** — Project manifests declare skill IDs only; no spec content committed to project repos
 - **Multi-tool support** — Works with Claude Code, GitHub Copilot CLI, OpenCode, and more
-- **70+ skills included** — Development workflows, code review, TDD, planning, debugging, and more
+- **60+ skills included** — Development workflows, code review, TDD, planning, debugging, and more
+
+## Prerequisites
+
+- **jq** — Install with your package manager (e.g., `sudo apt-get install jq`, `brew install jq`)
+- **git** — For cloning and repo detection
 
 ## Quick Start
 
 ```bash
 # Clone and install
 git clone https://github.com/<org>/skm ~/skm
-bash ~/skm/install.sh
+bash ~/skm/install.sh    # installs CLI, syncs library, wires ~/.bashrc
 
-# Add to your ~/.bashrc (enables tool wrappers + session lifecycle):
-source "${XDG_DATA_HOME:-$HOME/.local/share}/skm/shell/skm-init.sh"
-
-# Verify
+# Open a new terminal (or source ~/.bashrc), then:
 skm status
 ```
 
@@ -47,46 +49,50 @@ Layer 3 — Session (JIT, mid-session)
 
 ### Shell Wrappers
 
-When you source `skm-init.sh`, it provides wrapper functions for `claude`, `copilot`, and `opencode` that automatically:
+When you source `skm-init.sh` (done automatically by `install.sh`), it provides wrapper functions for `claude`, `copilot`, and `opencode` that automatically:
 1. Create a per-session staging directory
 2. Populate it from the project manifest (`.agents/skm.json`)
 3. Pass the staging dir to the tool via `--add-dir`
 4. Clean up on exit
-
-If artifact helpers are defined in your shell (e.g., `_artifact_ensure_dir`), the wrappers integrate with them automatically.
 
 ## CLI Reference
 
 ```
 skm <subcommand> [options] [arguments]
 
-Global Commands:
-  sync            Rebuild cold library from source repo + activate core symlinks
-  list            List available specs (--tag TAG, --type skill|agent)
-  search <query>  Search specs by keyword
-  status          Show core specs, project manifest, and session state
+Global:
+  sync            Rebuild core spec symlinks in global dirs
+  clean           Remove stale specs from global or project dirs
+    --project       Clean project dirs instead of global
+    --migrate       (with --project) Migrate legacy copies to manifest first
+    --dry-run       Show what would happen without making changes
+  status          Show core, session, manifest, and available specs (default)
 
-Project Commands:
-  init            Create project directory structure (.agents/, .claude/, etc.)
+Project:
+  init            Initialize project dirs and manifest stub
   add <id>        Add spec ID(s) to project manifest (.agents/skm.json)
-  remove <id>     Remove spec from project manifest
-  refresh         Refresh staging dir from manifest (re-symlink)
-  clean           Remove stale non-symlinks from global dirs (--project for project dir)
+  remove <id>     Remove spec ID(s) from project manifest
 
-Session Commands:
-  load <id>       Load a spec into the active session (JIT)
-  unload <id>     Remove a spec from the active session
-  loaded          Show specs in the active session
+Session:
+  load <id>       Symlink spec into active staging dir (JIT loading)
+  unload <id>     Remove spec from active staging dir
+  loaded          Show specs loaded in active session
 
-Maintenance:
-  generate-library  Regenerate library.json from disk contents
-  publish <id>      Publish a project-local spec to the source repo as a PR
-  migrate           Convert legacy .claude/skills/ copies to manifest-based setup
+Publishing:
+  publish <id>    Publish a local spec to the source repo as a PR
+    --dry-run       Show what would happen without making changes
+    --force         Overwrite if spec already exists in source repo
+
+Discovery:
+  list            List all specs in the library (--tag TAG, --type skill|agent)
+  search <query>  Search specs by keyword
+  libgen          Auto-generate library.json from disk contents
+  help            Show help
 ```
 
 ## Included Skills
 
-SKM ships with 65+ skills covering:
+SKM ships with 63 skills covering:
 
 | Category | Skills |
 |----------|--------|

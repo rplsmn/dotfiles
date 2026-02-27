@@ -139,15 +139,7 @@ _manifest_path() {
     echo ""
     return 1
   fi
-  local skm_manifest="$root/.agents/skm.json"
-  local legacy_manifest="$root/.agents/specs-sync.json"
-  if [[ -f "$skm_manifest" ]]; then
-    echo "$skm_manifest"
-  elif [[ -f "$legacy_manifest" ]]; then
-    echo "$legacy_manifest"
-  else
-    echo "$skm_manifest"  # default for new projects
-  fi
+  echo "$root/.agents/skm.json"
 }
 
 _ensure_manifest() {
@@ -310,42 +302,39 @@ skm — Skill Kit Manager (SKM)
 
 Usage: skm <subcommand> [options] [arguments]
 
-Machine sync (global dirs — core specs via symlinks):
+Global:
   sync            Rebuild core spec symlinks in global dirs
-  clean           Remove non-symlinks from global dirs (stale copies)
-    --project        Clean project .claude/ dir instead (only removes library-known specs)
+  clean           Remove stale specs from global dirs or project dirs
+    --project       Clean project dirs instead of global
+    --migrate       (with --project) Migrate legacy copies to manifest first
+    --dry-run       Show what would happen without making changes
   status          Show core, session, manifest, and available specs (default)
 
-Project manifest (declares which specs a project needs):
+Project:
   init            Initialize project dirs and manifest stub
   add <id>        Add spec ID(s) to project manifest (.agents/skm.json)
   remove <id>     Remove spec ID(s) from project manifest
 
-Session (active LLM session — staging dir):
+Session:
   load <id>       Symlink spec into active staging dir (JIT loading)
   unload <id>     Remove spec from active staging dir
   loaded          Show specs loaded in active session
-  refresh         Re-read manifest and refresh staging dir symlinks
-
-Migration:
-  migrate         Convert legacy spec copies to manifest-based loading
 
 Publishing:
-  publish <id>     Publish a local spec to the source repo as a PR
-    --dry-run        Show what would happen without making changes
-    --force          Overwrite if spec already exists in source repo
+  publish <id>    Publish a local spec to the source repo as a PR
+    --dry-run       Show what would happen without making changes
+    --force         Overwrite if spec already exists in source repo
 
 Discovery:
   list            List all specs in the library
-  search          Search specs by keyword or tag
-  generate-library  Auto-generate library.json from disk contents
+  search <query>  Search specs by keyword or tag
+  libgen          Auto-generate library.json from disk contents
   help            Show this help message
 
 Options:
   --tag TAG       Filter by tag (list subcommand)
   --type TYPE     Filter by type: skill, agent (list subcommand)
-  --quiet         Suppress output (sync/refresh subcommands)
-  --dry-run       Show what would happen without doing it (init/clean)
+  --quiet         Suppress output (sync subcommand)
 
 Global tool dirs: ~/.claude, ~/.copilot, ~/.agents, ~/.vibe
 
@@ -357,9 +346,9 @@ Examples:
   skm load debugging          # load spec into active session
   skm unload debugging        # unload spec from active session
   skm loaded                  # show active session specs
-  skm refresh                 # refresh staging dir from manifest
+  skm clean --project         # clean stale project specs
   skm list --type skill       # list all skills
-  skm generate-library        # regenerate library.json from disk
+  skm libgen                  # regenerate library.json from disk
 EOF
 }
 
@@ -512,7 +501,7 @@ cmd_status() {
       for line in "${local_lines[@]}"; do
         echo -e "$line"
       done
-      echo -e "  ${DIM}Run 'skm migrate' to convert to manifest-based loading${NC}"
+      echo -e "  ${DIM}Run 'skm clean --project --migrate' to convert to manifest-based loading${NC}"
       echo ""
     fi
   fi
@@ -646,6 +635,11 @@ cmd_add() {
     mv "$manifest.tmp" "$manifest"
 
     echo -e "${GREEN}✓ Added to manifest: $id ($type)${NC}"
+
+    # Auto-refresh staging if session is active
+    if [[ -n "${SKM_SESSION:-}" && -d "${SKM_SESSION:-}" ]]; then
+      _create_session_symlink "$id" "$SKM_SESSION" 2>/dev/null || true
+    fi
   done
 }
 
@@ -697,6 +691,11 @@ cmd_remove() {
         jq --arg id "$id" --arg key "$key" '.[$key] |= map(select(. != $id))' "$manifest" > "$manifest.tmp"
         mv "$manifest.tmp" "$manifest"
         echo -e "${GREEN}✓ Removed from manifest: $id ($type)${NC}"
+
+        # Auto-refresh staging if session is active
+        if [[ -n "${SKM_SESSION:-}" && -d "${SKM_SESSION:-}" ]]; then
+          _remove_session_symlink "$id" "$SKM_SESSION" 2>/dev/null || true
+        fi
       else
         echo -e "${YELLOW}Warning: $id not found in manifest ${key} array${NC}" >&2
       fi
@@ -709,6 +708,11 @@ cmd_remove() {
           mv "$manifest.tmp" "$manifest"
           echo -e "${GREEN}✓ Removed from manifest: $id (from $try_key)${NC}"
           found=true
+
+          # Auto-refresh staging if session is active
+          if [[ -n "${SKM_SESSION:-}" && -d "${SKM_SESSION:-}" ]]; then
+            _remove_session_symlink "$id" "$SKM_SESSION" 2>/dev/null || true
+          fi
         fi
       done
       if [[ "$found" == false ]]; then
@@ -716,112 +720,6 @@ cmd_remove() {
       fi
     fi
   done
-}
-
-cmd_refresh() {
-  _check_deps
-  _check_library
-
-  local quiet=false
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --quiet) quiet=true; shift ;;
-      *)       shift ;;
-    esac
-  done
-
-  local project_root
-  project_root="$(_project_root)"
-  if [[ -z "$project_root" ]]; then
-    return 0
-  fi
-
-  # Legacy detection: warn if old-style copies exist without manifest
-  local manifest
-  manifest="$(_manifest_path)"
-  local has_legacy=false
-  if [[ ! -f "$manifest" ]]; then
-    for subdir in "${SPEC_SUBDIRS[@]}"; do
-      local dir="$project_root/.claude/$subdir"
-      [[ -d "$dir" ]] || continue
-      for entry in "$dir"/*; do
-        [[ -e "$entry" ]] || continue
-        if [[ ! -L "$entry" ]]; then
-          has_legacy=true
-          break 2
-        fi
-      done
-    done
-  fi
-
-  if [[ "$has_legacy" == true && "$quiet" == false ]]; then
-    echo -e "${YELLOW}Warning: Legacy spec copies detected in .claude/ without a manifest.${NC}" >&2
-    echo -e "${YELLOW}Run 'skm migrate' to switch to manifest-based loading.${NC}" >&2
-  fi
-
-  # Session mode: re-read manifest and refresh staging dir symlinks
-  local staging="${SKM_SESSION:-}"
-  if [[ -z "$staging" ]]; then
-    if [[ "$quiet" == false && "$has_legacy" == false ]]; then
-      echo -e "${DIM}No active session. Nothing to refresh.${NC}"
-    fi
-    return 0
-  fi
-
-  if [[ ! -f "$manifest" ]]; then
-    if [[ "$quiet" == false ]]; then
-      echo -e "${DIM}No manifest found. Nothing to refresh.${NC}"
-    fi
-    return 0
-  fi
-
-  local refreshed=0
-
-  for spec_type in skill agent; do
-    while IFS= read -r id; do
-      [[ -z "$id" ]] && continue
-      if ! _spec_exists "$id"; then
-        if [[ "$quiet" == false ]]; then
-          echo -e "${YELLOW}Warning: $id not found in library, skipping${NC}" >&2
-        fi
-        continue
-      fi
-
-      local type
-      type="$(_spec_type "$id")"
-      local subdir
-      subdir="$(_type_subdir "$type")"
-      local source_path
-      source_path="$(_spec_source_path "$id")"
-
-      if [[ ! -e "$source_path" ]]; then
-        if [[ "$quiet" == false ]]; then
-          echo -e "${YELLOW}Warning: source not found for $id, skipping${NC}" >&2
-        fi
-        continue
-      fi
-
-      # Symlink into staging dir tool subdirs
-      for tool_subdir in .claude .copilot .agents .vibe; do
-        local target_dir="$staging/$tool_subdir/$subdir"
-        mkdir -p "$target_dir"
-        if [[ "$type" == "skill" ]]; then
-          ln -sfn "$source_path" "$target_dir/$id"
-        else
-          ln -sf "$source_path" "$target_dir/${id}.md"
-        fi
-      done
-      ((refreshed++)) || true
-    done < <(_read_manifest_ids "$manifest" "$spec_type")
-  done
-
-  if [[ "$quiet" == false ]]; then
-    if [[ "$refreshed" -gt 0 ]]; then
-      echo -e "${GREEN}✓ Refreshed $refreshed specs in staging dir${NC}"
-    else
-      echo -e "${DIM}Manifest is empty. Nothing to refresh.${NC}"
-    fi
-  fi
 }
 
 cmd_sync() {
@@ -954,16 +852,20 @@ cmd_init() {
 cmd_clean() {
   _check_deps
 
-  local dry_run=false project=false
+  local dry_run=false project=false migrate=false
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --dry-run) dry_run=true; shift ;;
       --project) project=true; shift ;;
+      --migrate) migrate=true; shift ;;
       *)         shift ;;
     esac
   done
 
   if [[ "$project" == true ]]; then
+    if [[ "$migrate" == true ]]; then
+      cmd_migrate
+    fi
     _clean_project "$dry_run"
   else
     _clean_global "$dry_run"
@@ -1146,9 +1048,6 @@ cmd_loaded() {
   local project_root
   project_root="$(_project_root)"
   local manifest="${project_root:+$project_root/.agents/skm.json}"
-  if [[ -n "$project_root" && ! -f "$manifest" && -f "$project_root/.agents/specs-sync.json" ]]; then
-    manifest="$project_root/.agents/specs-sync.json"
-  fi
 
   if [[ -n "$manifest" && -f "$manifest" ]]; then
     local id
@@ -1651,7 +1550,7 @@ EOF
   echo -e "${GREEN}✓ Publish complete for $spec_type '$id'${NC}"
 }
 
-cmd_generate_library() {
+cmd_libgen() {
   _check_deps
 
   # Locate repo root (from script location or git)
@@ -1777,13 +1676,11 @@ main() {
     search)     shift; cmd_search "$@" ;;
     add)        shift; cmd_add "$@" ;;
     remove)     shift; cmd_remove "$@" ;;
-    refresh)    shift; cmd_refresh "$@" ;;
     sync)       shift; cmd_sync "$@" ;;
     init)       shift; cmd_init "$@" ;;
     clean)      shift; cmd_clean "$@" ;;
-    migrate)    shift; cmd_migrate "$@" ;;
     publish)    shift; cmd_publish "$@" ;;
-    generate-library) shift; cmd_generate_library "$@" ;;
+    libgen)     shift; cmd_libgen "$@" ;;
     load)       shift; cmd_load "$@" ;;
     unload)     shift; cmd_unload "$@" ;;
     loaded)     shift; cmd_loaded "$@" ;;
