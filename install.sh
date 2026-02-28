@@ -51,26 +51,11 @@ fi
 REPO="$(cd "$(dirname "$0")" && pwd)"
 
 # --- Install bin scripts ---
-echo "==> Installing commands to ~/.local/bin"
+echo "==> Installing machine-sync to ~/.local/bin"
 mkdir -p "$HOME/.local/bin"
 export PATH="$HOME/.local/bin:$PATH"
-cp "$REPO/bin/artifact-sync" "$HOME/.local/bin/"
 sed "s|^REPO=.*|REPO=\"$REPO\"|" "$REPO/bin/machine-sync" > "$HOME/.local/bin/machine-sync"
 chmod +x "$HOME/.local/bin/machine-sync"
-cp "$REPO/bin/specs-sync" "$HOME/.local/bin/specs-sync"
-chmod +x "$HOME/.local/bin/specs-sync"
-
-# --- Config file (persistent repo path for specs-sync publish, etc.) ---
-echo "==> Writing specs config"
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/llm-specs"
-mkdir -p "$CONFIG_DIR"
-cat > "$CONFIG_DIR/config" <<EOF
-REPO="$REPO"
-EOF
-
-# --- Artifacts repo ---
-echo "==> Syncing artifacts"
-artifact-sync
 
 # --- Sync configs ---
 bash "$REPO/sync.sh"

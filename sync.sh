@@ -5,13 +5,6 @@ set -e
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# --- Config file (persistent repo path for specs-sync publish, etc.) ---
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/llm-specs"
-mkdir -p "$CONFIG_DIR"
-cat > "$CONFIG_DIR/config" <<EOF
-REPO="$REPO_DIR"
-EOF
-
 echo "==> Syncing configs from $REPO_DIR"
 
 # --- Shell config (append, idempotent via marker block) ---
@@ -31,26 +24,11 @@ fi
 echo "==> Syncing gitconfig"
 cp "$REPO_DIR/dot_gitconfig" "$HOME/.gitconfig"
 
-# --- LLM tool directories ---
+# --- LLM tool configs ---
 echo "==> Syncing LLM tool configs"
-mkdir -p "$HOME/.claude" "$HOME/.copilot" "$HOME/.agents" "$HOME/.vibe/prompts"
+mkdir -p "$HOME/.claude" "$HOME/.copilot"
 
-# --- Install specs-sync CLI (bootstrap — must happen before specs sync) ---
-echo "==> Installing specs-sync CLI"
-mkdir -p "$HOME/.local/bin"
-cp "$REPO_DIR/bin/specs-sync" "$HOME/.local/bin/specs-sync"
-chmod +x "$HOME/.local/bin/specs-sync"
-
-# --- Specs: update cold library + activate core symlinks ---
-echo "==> Syncing specs (cold library + global symlinks)"
-"$HOME/.local/bin/specs-sync" sync --quiet
-
-# --- Global instructions ---
-cp "$REPO_DIR/global-instructions.md" "$HOME/.claude/CLAUDE.md"
-cp "$REPO_DIR/global-instructions.md" "$HOME/.copilot/copilot-instructions.md"
-cp "$REPO_DIR/global-instructions.md" "$HOME/.vibe/prompts/cli.md"
-
-# --- Claude Code specifics ---
+# --- Claude Code ---
 echo "==> Syncing Claude Code config"
 cp "$REPO_DIR/claude-code/claude-statusline.sh" "$HOME/.claude/statusline.sh"
 chmod +x "$HOME/.claude/statusline.sh"
@@ -61,10 +39,13 @@ else
   cp "$REPO_DIR/claude-code/claude-global-settings.json" "$HOME/.claude/settings.json"
 fi
 
+# --- Copilot CLI ---
+echo "==> Syncing Copilot CLI config"
+cp "$REPO_DIR/copilot-cli/copilot-commit-message-instructions.md" "$HOME/.copilot/"
+
 # --- Bin scripts ---
-echo "==> Syncing bin scripts to ~/.local/bin"
+echo "==> Syncing machine-sync to ~/.local/bin"
 mkdir -p "$HOME/.local/bin"
-cp "$REPO_DIR/bin/artifact-sync" "$HOME/.local/bin/"
 sed "s|^REPO=.*|REPO=\"$REPO_DIR\"|" "$REPO_DIR/bin/machine-sync" > "$HOME/.local/bin/machine-sync"
 chmod +x "$HOME/.local/bin/machine-sync"
 

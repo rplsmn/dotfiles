@@ -17,8 +17,8 @@ It also provisions:
 
 ```bash
 bash install.sh          # One-time machine setup (tools, SSH, bin scripts, then sync)
-bash sync.sh             # Re-runnable: syncs configs, cold library, bin scripts to machine
-machine-sync             # Pulls repo then runs sync.sh (installed to ~/.local/bin)specs-sync <subcommand>  # Cold Specs Library CLI (see below)
+bash sync.sh             # Re-runnable: syncs configs + bin scripts to machine
+machine-sync             # Pulls repo then runs sync.sh (installed to ~/.local/bin)
 ```
 
 There is no build system, test suite, linter, or CI/CD. All scripts are pure Bash.
@@ -36,7 +36,8 @@ shared-safe-config/
 │   └── copilot-commit-message-instructions.md
 ├── install.sh                       # One-time bootstrap
 ├── sync.sh                          # Re-runnable config sync
-├── dot_gitconfig                    # Git aliases and config - soon to be deprecated
+├── dot_bashrc                       # PS1 with git branch (injected into ~/.bashrc)
+├── dot_gitconfig                    # Git aliases and config
 ├── AGENTS.md                        # This file
 └── CLAUDE.md                        # Points to AGENTS.md
 ```
@@ -45,7 +46,8 @@ shared-safe-config/
 
 | File | Purpose |
 |------|---------|
-| `dot_gitconfig` | Git aliases and config (legacy, may be extracted) |
+| `dot_bashrc` | PS1 prompt with git branch display |
+| `dot_gitconfig` | Git aliases and config |
 | `bin/machine-sync` | Pull repo + run sync (install.sh patches the `REPO=` line via sed) |
 
 ## Architecture
@@ -55,8 +57,6 @@ shared-safe-config/
 ```
 ~/.local/bin/
 └── machine-sync                 # Repo pull + sync
-
-~/.config/llm-specs/config       # REPO= path to source repo
 
 ~/.claude/                       # Global Claude Code dir
 ├── statusline.sh
