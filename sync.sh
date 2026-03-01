@@ -42,6 +42,14 @@ fi
 # --- Copilot CLI ---
 echo "==> Syncing Copilot CLI config"
 cp "$REPO_DIR/copilot-cli/copilot-commit-message-instructions.md" "$HOME/.copilot/"
+cp "$REPO_DIR/copilot-cli/copilot-statusline.sh" "$HOME/.copilot/copilot-statusline.sh"
+chmod +x "$HOME/.copilot/copilot-statusline.sh"
+if [ -f "$HOME/.copilot/config.json" ]; then
+  jq -s '.[0] * .[1]' "$HOME/.copilot/config.json" "$REPO_DIR/copilot-cli/config.json" > "$HOME/.copilot/config.json.tmp"
+  mv "$HOME/.copilot/config.json.tmp" "$HOME/.copilot/config.json"
+else
+  cp "$REPO_DIR/copilot-cli/config.json" "$HOME/.copilot/config.json"
+fi
 
 # --- Bin scripts ---
 echo "==> Syncing machine-sync to ~/.local/bin"

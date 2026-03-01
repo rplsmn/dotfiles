@@ -1,0 +1,11 @@
+{
+  "status_line": {
+    "type": "command",
+    "command": "/home/raph/.copilot/copilot-statusline.sh"
+  },
+  "feature_flags": {
+    "enabled": [
+      "STATUS_LINE"
+    ]
+  }
+}
