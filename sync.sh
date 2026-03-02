@@ -51,6 +51,11 @@ else
   cp "$REPO_DIR/copilot-cli/config.json" "$HOME/.copilot/config.json"
 fi
 
+# --- AKM global instructions ---
+echo "==> Syncing global-instructions.md"
+mkdir -p "$HOME/.akm"
+cp "$REPO_DIR/global-instructions.md" "$HOME/.akm/global-instructions.md"
+
 # --- Bin scripts ---
 echo "==> Syncing machine-sync to ~/.local/bin"
 mkdir -p "$HOME/.local/bin"
