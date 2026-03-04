@@ -3,6 +3,7 @@
     "type": "command",
     "command": "/home/raph/.copilot/copilot-statusline.sh"
   },
+  "include_coauthor" : false,
   "feature_flags": {
     "enabled": [
       "STATUS_LINE"
