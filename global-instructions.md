@@ -1,62 +1,64 @@
-## LLM Agent Workflow
+### General behavior
 
-### The Development Loop
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ 1. READ DOCS (if exist)                                 │
-│    └─ macro plan / implementation log / codebase map    │
-├─────────────────────────────────────────────────────────┤
-│ 2. CREATE BRANCH                                        │
-│    └─ git checkout -b <feature/fix/docs>/<description>  │
-├─────────────────────────────────────────────────────────┤
-│ 3. CREATE PHASE PLAN                                    │
-│    └─ plans/phase-X.X-name.md (detailed tasks, tests)   │
-├─────────────────────────────────────────────────────────┤
-│ 4. IMPLEMENT (TDD)                                      │
-│    └─ Write tests first → code → test → review          │
-├─────────────────────────────────────────────────────────┤
-│ 5. COMMIT OFTEN                                         │
-│    └─ Clear commit messages / smallest working commits  │
-├─────────────────────────────────────────────────────────┤
-│ 6. PUSH & CREATE PR                                     │
-│    └─ Push when done -> Open PR → wait for human review │
-├─────────────────────────────────────────────────────────┤
-│ 7. UPDATE DOCS (after human approval) e.g :             │
-│    ├─ implementation logs                               │
-│    └─ codebase map                                      │
-└─────────────────────────────────────────────────────────┘
-        │                                        │
-        └────────── Loop back to step 1 ─────────┘
-```
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
-### The Team
+1. Think Before Coding
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
 
-- The orchestrator is the one speaking to the human. His role is to dispatch agents and preserve his context window as much as possible. He is the safekeeper of the session goals.
-- The orchestrator relies as much as possible on sub-agents, even other orchestrators, to preserve his context window
+Before implementing:
 
-### Quick Development Steps
+State your assumptions explicitly. If uncertain, ask.
+If multiple interpretations exist, present them - don't pick silently.
+If a simpler approach exists, say so. Push back when warranted.
+If something is unclear, stop. Name what's confusing. Ask.
 
-1. Read task requirements from a plan. **Have the human create one if there is none !**
+2. Simplicity First
+**Minimum code that solves the problem. Nothing speculative.**
 
-**IF `task-X-plan.md` (detailed implementation plan for task X) DOESN'T EXIST:**
+No features beyond what was asked.
+No abstractions for single-use code.
+No "flexibility" or "configurability" that wasn't requested.
+No error handling for impossible scenarios.
+If you write 200 lines and it could be 50, rewrite it.
 
-1. Create detailed implementation plan in `task-X-plan.md`
-2. Commit with a detailed message to a branch (never to main)
-3. Push branch and create PR for human review
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
 
-Dispatch a *planning-specialist* agent for this task
+3. Surgical Changes
 
-**IF `task-X-plan.md` for the current task ALREADY EXISTS:**
+**Touch only what you must. Clean up only your own mess.**
 
-1. Create TodoWrite list with specific subtasks and move to a branch
-2. Write unit tests for core functionality first
-3. Implement code, run the test suite after each new code addition
-4. Verify all exit/success criteria and definition of done met
-5. Commit often with conventional commit messages (WHY over HOW/WHAT)
-6. Push branch and create PR for human review
+When editing existing code:
 
-Dispatch a *coding-specialist* agent for this task
+Don't "improve" adjacent code, comments, or formatting.
+Don't refactor things that aren't broken.
+Match existing style, even if you'd do it differently.
+If you notice unrelated dead code, mention it - don't delete it.
+When your changes create orphans:
+
+Remove imports/variables/functions that YOUR changes made unused.
+Don't remove pre-existing dead code unless asked.
+The test: Every changed line should trace directly to the user's request.
+
+4. Goal-Driven Execution
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+
+"Add validation" → "Write tests for invalid inputs, then make them pass"
+"Fix the bug" → "Write a test that reproduces it, then make it pass"
+"Refactor X" → "Ensure tests pass before and after"
+For multi-step tasks, state a brief plan:
+
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+### Tone
+
+Use /caveman to interact with the user, unless asked not to.
 
 ### Long-Running Tasks
 
@@ -64,7 +66,7 @@ For any task that blocks progress (e.g., deployment, long builds):
 
 1. **Do NOT run it yourself** - it will timeout or block progress
 2. **Provide the command** to the human with clear instructions
-3. **Wait for feedback** - the human will run it and report results
+3. **Wait for feedback** - the human will run it and report results, open AskUserQuestion to collect
 4. **Complete all your other independent work before handing off**
 5. **Continue based on results** - adjust approach if needed
 
@@ -80,16 +82,12 @@ And let me know when it's complete.
 
 ### Completion Protocol
 
-- When working on a new phase/task independent of the previous one, create a new dedicated branch
-- The human in the loop is responsible for reviewing your work through the PRs
-- ALWAYS push to feature/fix/docs branches, NEVER directly to main
+- Use AskUserQuestion to prompt the human for review of your work, allowing you to continue or edit / stop.
 
-## Artifact Storage
+### Artifact Storage
 
 When producing non-code outputs (plans, research, session notes, design
-docs, ADRs, evaluations), save them to the artifacts directory that is
-mounted alongside this project. It is the additional directory under
-~/.akm/artifacts/<$REPO>/ visible via your file access.
+docs, ADRs, evaluations), unless specifically asked not to, save them to the <artifacts> directory : the additional working directory mounted alongside this project.
 
 Directory conventions inside the artifacts folder:
 
@@ -99,4 +97,6 @@ Directory conventions inside the artifacts folder:
 - prompts/     → Reusable prompt templates
 - archive/     → Completed/superseded items (moved here, never deleted, by archive-artifact)
 
-Never save plans, research, or session notes inside the working repository.
+Never save plans, research, or session notes inside the working repository unless asked to. 
+
+**IMPORTANT** : Project-level agent instructions live in AGENTS.md!
