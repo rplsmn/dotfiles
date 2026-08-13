@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# config-push: snapshot this machine's live configs into the repo and, after
+# you eyeball the diff, commit + push so they become the new truth for every
+# machine. Interactive — nothing leaves the machine without a y/N greenlight.
+set -euo pipefail
+
+REPO="${XDG_DATA_HOME:-$HOME/.local/share}/config-sync"
+
+# shellcheck source=/dev/null
+source "$REPO/manifest.sh"
+
+extract_block() {
+  sed -n "/# >>> $BASHRC_MARKER >>>/,/# <<< $BASHRC_MARKER <<</p" "$1" | sed '1d;$d'
+}
+
+echo "==> Snapshotting live configs into the repo"
+for entry in "${MANIFEST[@]}"; do
+  IFS='|' read -r src dest mode <<< "$entry"
+  case "$mode" in
+    copy)
+      cp "$dest" "$REPO/$src"
+      echo "    $dest -> $src"
+      ;;
+    block)
+      body="$(extract_block "$dest")"
+      if [ -z "$body" ]; then
+        echo "!! no '$BASHRC_MARKER' block in $dest — run config-pull first. Skipping." >&2
+      else
+        printf '%s\n' "$body" > "$REPO/$src"
+        echo "    [$dest block] -> $src"
+      fi
+      ;;
+  esac
+done
+
+git -C "$REPO" add -A
+if git -C "$REPO" diff --cached --quiet; then
+  echo "==> No changes. Nothing to push."
+  exit 0
+fi
+
+echo
+echo "==== staged diff (this becomes the new truth for ALL machines) ===="
+git -C "$REPO" --no-pager diff --cached
+echo "==================================================================="
+read -rp "Push this snapshot? [y/N] " ans
+case "$ans" in
+  [yY]|[yY][eE][sS])
+    git -C "$REPO" commit -m "snapshot from $(hostname) on $(date +%Y-%m-%d)"
+    git -C "$REPO" push
+    echo "==> Pushed. Other machines: run config-pull."
+    ;;
+  *)
+    echo "==> Aborted. Changes left staged."
+    echo "    Unstage with: git -C \"$REPO\" restore --staged ."
+    ;;
+esac

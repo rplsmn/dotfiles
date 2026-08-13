@@ -1,47 +1,42 @@
-Setup new machine with this:
+# dotfiles
 
-# Install steps
+Dead-simple config sync for my Ubuntu/Debian machines. One user (me), one truth
+(this repo's `main`). No frameworks, no secrets — just git, bash, sed.
 
-## Install deps
+Manages three files:
 
-```bash
-sudo apt update
-sudo apt install curl
-```
+| Repo file            | Lands at        | How            |
+|----------------------|-----------------|----------------|
+| `files/gitconfig`    | `~/.gitconfig`  | whole file     |
+| `files/tmux.conf`    | `~/.tmux.conf`  | whole file     |
+| `files/bashrc.snippet` | `~/.bashrc`   | marker block   |
 
-## Install GH
-
-To install:
-
-```bash
-(type -p wget >/dev/null || (sudo apt update && sudo apt install wget -y)) \
- && sudo mkdir -p -m 755 /etc/apt/keyrings \
- && out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
- && cat $out | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
- && sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
- && sudo mkdir -p -m 755 /etc/apt/sources.list.d \
- && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
- && sudo apt update \
- && sudo apt install gh -y
-```
-
-## Authenticate
+## New machine
 
 ```bash
-gh auth login
+curl -fsSL https://raw.githubusercontent.com/rplsmn/dotfiles/main/bootstrap.sh | bash
 ```
 
-## Install the LLM suite
+Clones this repo to `~/.local/share/config-sync`, installs the two commands
+below into `~/.local/bin`, and applies every config.
 
-```bash
-gh repo clone rplsmn/shared-safe-config ~/<path/>shared-safe-config
-bash ~/<path/>shared-safe-config/install.sh
-```
+## Daily use
 
-Requires: Ubuntu LTS, git, curl, and [GitHub CLI](https://cli.github.com/) (`gh`) installed and authenticated.
+- **`config-pull`** — pull the latest truth from the remote and apply it here
+  (overwrites the managed files; no backups).
+- **`config-push`** — snapshot this machine's live configs, show you the diff,
+  and after a `y/N` greenlight, commit + push so every other machine can pull it.
 
-After pulling config changes, re-sync without reinstalling tools:
+Typical flow: tweak `~/.tmux.conf` on machine A → `config-push` → on machine B
+run `config-pull`.
 
-```bash
-machine-sync
-```
+## Notes
+
+- **Overwrite model:** latest remote `main` is always the truth. `config-pull`
+  clobbers local copies. That's the point — it frees you from tracking which
+  tweak made it to which machine.
+- **`.bashrc`** is only partially owned: your snippet lives between
+  `# >>> config-sync >>>` / `# <<< config-sync <<<` markers; the rest of the
+  file (stock Ubuntu content) is left alone per machine.
+- **SSH config is intentionally not managed** — done by hand for now.
+- **Adding a file:** add one line to `manifest.sh`; both commands pick it up.

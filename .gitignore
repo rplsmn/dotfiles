@@ -1,1 +1,8 @@
-.pub # let's try no avoid committing my ssh key by mistake
+# Belt-and-suspenders: never commit private keys or secrets, even by accident.
+# (SSH is intentionally NOT managed by this repo yet.)
+id_*
+!*.pub
+*.pem
+*_rsa
+*_ed25519
+.env

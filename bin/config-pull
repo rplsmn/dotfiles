@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# config-pull: fetch the latest truth from the remote and apply it to this
+# machine. Overwrites managed files wholesale (no backups). Safe to re-run.
+set -euo pipefail
+
+REPO="${XDG_DATA_HOME:-$HOME/.local/share}/config-sync"
+BIN="$HOME/.local/bin"
+
+# shellcheck source=/dev/null
+source "$REPO/manifest.sh"
+
+echo "==> Fetching latest from remote"
+git -C "$REPO" pull --ff-only
+
+apply_block() {
+  local src="$1" dest="$2"
+  touch "$dest"
+  for id in "$BASHRC_MARKER" "${BASHRC_LEGACY_MARKERS[@]}"; do
+    sed -i "/# >>> $id >>>/,/# <<< $id <<</d" "$dest"
+  done
+  {
+    echo "# >>> $BASHRC_MARKER >>>"
+    cat "$REPO/$src"
+    echo "# <<< $BASHRC_MARKER <<<"
+  } >> "$dest"
+}
+
+for entry in "${MANIFEST[@]}"; do
+  IFS='|' read -r src dest mode <<< "$entry"
+  case "$mode" in
+    copy)  cp "$REPO/$src" "$dest"; echo "==> wrote $dest" ;;
+    block) apply_block "$src" "$dest"; echo "==> updated block in $dest" ;;
+    *)     echo "!! unknown mode '$mode' for $src" >&2; exit 1 ;;
+  esac
+done
+
+echo "==> Installing commands to $BIN"
+mkdir -p "$BIN"
+install -m 0755 "$REPO/bin/config-pull" "$BIN/config-pull"
+install -m 0755 "$REPO/bin/config-push" "$BIN/config-push"
+
+echo "==> Done. Reload your shells:"
+echo "    source ~/.bashrc"
+echo "    tmux source-file ~/.tmux.conf   # if tmux is running"
