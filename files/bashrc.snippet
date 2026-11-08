@@ -8,6 +8,13 @@ function ssh-tmux() {
   ssh -t "$1" "tmux attach || tmux new -s remote"
 }
 
+# mosh sessions: Termius-mosh cannot render 24-bit color (mosh 1.3 lib).
+# Drop to a palette TERM so tmux converts RGB hex to 256 colors for this
+# client; truecolor SSH clients keep exact colors.
+if [ -z "$TMUX" ] && [ -z "$HERDR_ENV" ] && ps -o comm= -p "$PPID" 2>/dev/null | grep -q '^mosh-server$'; then
+  export TERM=screen-256color
+fi
+
 if [ -z "$TMUX" ] && [ -z "$HERDR_ENV" ]; then
   tmux attach -t default || tmux new -s default
 fi
