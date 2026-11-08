@@ -8,6 +8,10 @@ function ssh-tmux() {
   ssh -t "$1" "tmux attach || tmux new -s remote"
 }
 
-if command -v tmux &> /dev/null && [ -n "$PS1" ] && [[ ! "$TERM" =~ screen ]] && [[ ! "$TERM" =~ tmux ]] && [ -z "$TMUX" ]; then
+if [ -z "$TMUX" ] && [ -z "$HERDR_ENV" ]; then
+  tmux attach -t default || tmux new -s default
+fi
+
+if command -v tmux &> /dev/null && [ -n "$PS1" ] && [[ ! "$TERM" =~ screen ]] && [[ ! "$TERM" =~ tmux ]] && [ -z "$TMUX" ] && [ -z "$HERDR_ENV" ]; then
   exec tmux
 fi
